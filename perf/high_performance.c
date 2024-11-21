@@ -184,6 +184,35 @@ float dot_ps_512(float* a, float* b, size_t size) {
     return final_result;
 }
 
+/*
+Transpose helps get rid of cache misses
+*/
+void transpose_matrix(float* B, float* B_t, int K, int N) {
+    for (int i = 0; i < K; ++i) {
+        for (int j = 0; j < N; ++j) {
+            B_t[j * K + i] = B[i * N + j];
+        }
+    }
+}
+
+void matmul_avx_optimized(float* A, float* B_t, float* C, int M, int K, int N) {
+    float* temp = aligned_alloc(ALIGNMNET_SIZE, 8);
+    for (int i = 0; i < M; ++i) {
+        for (int j = 0; j < N; ++j) {
+            __m256 sum = _mm256_setzero_ps();
+            for (int k = 0; k < K; k += 8) {
+                __m256 a = _mm256_load_ps(&A[i * K + k]);   // A[i][k:k+7]
+                __m256 b = _mm256_load_ps(&B_t[j * K + k]); // B_t[j][k:k+7]
+                sum = _mm256_fmadd_ps(a, b, sum);
+            }
+            _mm256_store_ps(temp, sum);
+            float c_sum = temp[0] + temp[1] + temp[2] + temp[3] +
+                          temp[4] + temp[5] + temp[6] + temp[7];
+            C[i * N + j] = c_sum;
+        }
+    }
+}
+
 int main() {
     // Test data
     size_t length = 5000000; // Large vector size for benchmarking
@@ -226,6 +255,33 @@ int main() {
     end = clock();
     double time5 = (double)(end - start) / CLOCKS_PER_SEC;
     printf("dot_ps_512 result: %f, time: %f seconds\n", result5, time5);
+
+
+    // Example matrix dimensions
+    int M = 4, K = 8, N = 4; // A: M x K, B: K x N, C: M x N
+    float* A = aligned_alloc(ALIGNMNET_SIZE, M * K * sizeof(float));
+    float* B = aligned_alloc(ALIGNMNET_SIZE, K * N * sizeof(float));
+    float* B_t = aligned_alloc(ALIGNMNET_SIZE, K * N * sizeof(float)); // Transposed B
+    float* C = aligned_alloc(ALIGNMNET_SIZE, M * N * sizeof(float));
+
+    // Initialize matrices A and B with example values
+    for (int i = 0; i < M * K; ++i) A[i] = (float)(i + 1);      // A = [1, 2, 3, ...]
+    for (int i = 0; i < K * N; ++i) B[i] = (float)(i + 1);      // B = [1, 2, 3, ...]
+
+    // Transpose B into B_t
+    transpose_matrix(B, B_t, K, N);
+
+    // Perform optimized matrix multiplication
+    matmul_avx_optimized(A, B_t, C, M, K, N);
+
+    // Print result matrix C
+    printf("Result Matrix C:\n");
+    for (int i = 0; i < M; ++i) {
+        for (int j = 0; j < N; ++j) {
+            printf("%f ", C[i * N + j]);
+        }
+        printf("\n");
+    }
 
     return 0;
 }
