@@ -5,11 +5,10 @@
 #include <time.h>
 #include <stdlib.h>
 #include <cpuid.h> // GCC/Clang
-#include <stdint.h>
 
 
 #ifndef ALIGNMENT_SIZE
-    #define ALIGNMNET_SIZE 64
+    #define ALIGNMENT_SIZE 8
 #endif
 
 int supports_avx() {
@@ -55,7 +54,7 @@ float dot_ps_128(float* a, float* b, size_t size) {
         sum_acc = _mm_add_ps(sum_acc, prod);
     }
 
-    float* result = aligned_alloc(ALIGNMNET_SIZE, pack_size);
+    float* result = aligned_alloc(8, pack_size * sizeof(float));
     _mm_store_ps(result, sum_acc);
 
     float final_result = 0;
@@ -138,7 +137,7 @@ float dot_ps_256(float* a, float* b, size_t size) {
         sum_acc = _mm256_add_ps(sum_acc, prod);
     }
 
-    float* result = aligned_alloc(ALIGNMNET_SIZE, pack_size); // Make sure this is cache aligned, otherwise it throws segfault
+    float* result = aligned_alloc(ALIGNMENT_SIZE, pack_size * sizeof(float)); // Make sure this is cache aligned, otherwise it throws segfault
     _mm256_store_ps(result, sum_acc);
 
     float final_result = 0;
@@ -154,6 +153,7 @@ float dot_ps_256(float* a, float* b, size_t size) {
     return final_result;
 }
 
+#ifdef __AVX512F__
 float dot_ps_512(float* a, float* b, size_t size) {
     __m512 sum_acc = _mm512_setzero_ps();
     size_t i = 0;
@@ -168,7 +168,7 @@ float dot_ps_512(float* a, float* b, size_t size) {
         sum_acc = _mm512_add_ps(sum_acc, prod);
     }
 
-    float* result = aligned_alloc(ALIGNMNET_SIZE, pack_size);
+    float* result = aligned_alloc(ALIGNMENT_SIZE, pack_size);
     _mm512_store_ps(result, sum_acc);
 
     float final_result = 0;
@@ -183,6 +183,7 @@ float dot_ps_512(float* a, float* b, size_t size) {
 
     return final_result;
 }
+#endif
 
 /*
 Transpose helps get rid of cache misses
@@ -208,7 +209,7 @@ void matmul_single_thread(float* A, float* B_t, float* C, int M, int K, int N) {
 }
 
 void matmul_avx_optimized(float* A, float* B_t, float* C, int M, int K, int N) {
-    float* temp = aligned_alloc(ALIGNMNET_SIZE, 8);
+    float* temp = aligned_alloc(ALIGNMENT_SIZE, 8);
     for (int i = 0; i < M; ++i) {
         for (int j = 0; j < N; ++j) {
             __m256 sum = _mm256_setzero_ps();
@@ -226,7 +227,7 @@ void matmul_avx_optimized(float* A, float* B_t, float* C, int M, int K, int N) {
 }
 
 void matmul_avx_optimized_loop_unrolling(float* A, float* B_t, float* C, int M, int K, int N) {
-    float* temp = aligned_alloc(ALIGNMNET_SIZE, 8 * sizeof(float));
+    float* temp = aligned_alloc(ALIGNMENT_SIZE, 8 * sizeof(float));
     for (int i = 0; i < M; ++i) {
         for (int j = 0; j < N; ++j) {
             __m256 sum1 = _mm256_setzero_ps();
@@ -249,8 +250,9 @@ void matmul_avx_optimized_loop_unrolling(float* A, float* B_t, float* C, int M, 
     }
 }
 
+#ifdef __AVX512F__
 void matmul_avx_512_optimized_loop_unrolling(float* A, float* B_t, float* C, int M, int K, int N) {
-    float* temp = aligned_alloc(ALIGNMNET_SIZE, 16 * sizeof(float));
+    float* temp = aligned_alloc(ALIGNMENT_SIZE, 16 * sizeof(float));
     for (int i = 0; i < M; ++i) {
         for (int j = 0; j < N; ++j) {
             __m512 sum1 = _mm512_setzero_ps();
@@ -274,11 +276,12 @@ void matmul_avx_512_optimized_loop_unrolling(float* A, float* B_t, float* C, int
         }
     }
 }
+#endif
 
 int main() {
     // Test data
     size_t length = 5000000; // Large vector size for benchmarking
-    float* a = aligned_alloc(ALIGNMNET_SIZE, length * sizeof(float));
+    float* a = aligned_alloc(ALIGNMENT_SIZE, length * sizeof(float));
     
     for (size_t i = 0; i < length; i++)
         a[i] = 1.0;
@@ -312,23 +315,31 @@ int main() {
     printf("dot_ps_256 result: %f, time: %f seconds\n", result4, time4);
 
     // Benchmark dot_ps_512
+    #ifdef __AVX512F__
     start = clock();
     float result5 = dot_ps_512(a, a, length);
     end = clock();
     double time5 = (double)(end - start) / CLOCKS_PER_SEC;
     printf("dot_ps_512 result: %f, time: %f seconds\n", result5, time5);
-
+    #endif
 
     // Example matrix dimensions
     int M = 1536, K = 1536, N = 1536; // A: M x K, B: K x N, C: M x N
-    float* A = aligned_alloc(ALIGNMNET_SIZE, M * K * sizeof(float));
-    float* B = aligned_alloc(ALIGNMNET_SIZE, K * N * sizeof(float));
-    float* B_t = aligned_alloc(ALIGNMNET_SIZE, K * N * sizeof(float)); // Transposed B
-    float* C = aligned_alloc(ALIGNMNET_SIZE, M * N * sizeof(float));
+    float* A = aligned_alloc(ALIGNMENT_SIZE, M * K * sizeof(float));
+    float* B = aligned_alloc(ALIGNMENT_SIZE, K * N * sizeof(float));
+    float* B_t = aligned_alloc(ALIGNMENT_SIZE, K * N * sizeof(float)); // Transposed B
+    float* C = aligned_alloc(ALIGNMENT_SIZE, M * N * sizeof(float));
 
-    // Initialize matrices A and B with example values
-    for (int i = 0; i < M * K; ++i) A[i] = (float)(i + 1);
-    for (int i = 0; i < K * N; ++i) B[i] = (float)(i + 1);
+    // Seed the random number generator
+    srand((unsigned int)time(NULL));
+
+    // Populate matrices A and B with random floating-point values
+    for (int i = 0; i < M * K; ++i) {
+        A[i] = (float)rand() / RAND_MAX; // Random float between 0 and 1
+    }
+    for (int i = 0; i < K * N; ++i) {
+        B[i] = (float)rand() / RAND_MAX; // Random float between 0 and 1
+    }
 
     // Transpose B into B_t
     start = clock();
@@ -351,10 +362,12 @@ int main() {
     end = clock();
     printf("matmul avx unrolled loop time: %f seconds\n", ((double)(end - start) / CLOCKS_PER_SEC));
 
+    #ifdef __AVX512F__
     start = clock();
     matmul_avx_512_optimized_loop_unrolling(A, B_t, C, M, K, N);
     end = clock();
     printf("matmul avx512 unrolled loop time: %f seconds\n", ((double)(end - start) / CLOCKS_PER_SEC));
+    #endif
 
     return 0;
 }
