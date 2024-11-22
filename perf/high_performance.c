@@ -195,6 +195,18 @@ void transpose_matrix(float* B, float* B_t, int K, int N) {
     }
 }
 
+void matmul_single_thread(float* A, float* B_t, float* C, int M, int K, int N) {
+    for (int i = 0; i < M; ++i) {
+        for (int j = 0; j < N; ++j) {
+            float sum = 0;
+            for (int k = 0; k < K; k += 1) {
+                sum += A[i * K + k] + B_t[j * K + k];
+            }
+            C[i * N + j] = sum;
+        }
+    }
+}
+
 void matmul_avx_optimized(float* A, float* B_t, float* C, int M, int K, int N) {
     float* temp = aligned_alloc(ALIGNMNET_SIZE, 8);
     for (int i = 0; i < M; ++i) {
@@ -258,30 +270,30 @@ int main() {
 
 
     // Example matrix dimensions
-    int M = 4, K = 8, N = 4; // A: M x K, B: K x N, C: M x N
+    int M = 1536, K = 1536, N = 1536; // A: M x K, B: K x N, C: M x N
     float* A = aligned_alloc(ALIGNMNET_SIZE, M * K * sizeof(float));
     float* B = aligned_alloc(ALIGNMNET_SIZE, K * N * sizeof(float));
     float* B_t = aligned_alloc(ALIGNMNET_SIZE, K * N * sizeof(float)); // Transposed B
     float* C = aligned_alloc(ALIGNMNET_SIZE, M * N * sizeof(float));
 
     // Initialize matrices A and B with example values
-    for (int i = 0; i < M * K; ++i) A[i] = (float)(i + 1);      // A = [1, 2, 3, ...]
-    for (int i = 0; i < K * N; ++i) B[i] = (float)(i + 1);      // B = [1, 2, 3, ...]
+    for (int i = 0; i < M * K; ++i) A[i] = (float)(i + 1);
+    for (int i = 0; i < K * N; ++i) B[i] = (float)(i + 1);
 
     // Transpose B into B_t
+    start = clock();
     transpose_matrix(B, B_t, K, N);
 
-    // Perform optimized matrix multiplication
-    matmul_avx_optimized(A, B_t, C, M, K, N);
+    matmul_single_thread(A, B_t, C, M, K, N);
+    end = clock();
+    printf("matmul single thread time: %f seconds\n", ((double)(end - start) / CLOCKS_PER_SEC));
 
-    // Print result matrix C
-    printf("Result Matrix C:\n");
-    for (int i = 0; i < M; ++i) {
-        for (int j = 0; j < N; ++j) {
-            printf("%f ", C[i * N + j]);
-        }
-        printf("\n");
-    }
+    start = clock();
+    transpose_matrix(B, B_t, K, N);
+
+    matmul_avx_optimized(A, B_t, C, M, K, N);
+    end = clock();
+    printf("matmul avx time: %f seconds\n", ((double)(end - start) / CLOCKS_PER_SEC));
 
     return 0;
 }
