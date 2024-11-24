@@ -5,11 +5,9 @@
 #include <time.h>
 #include <stdlib.h>
 #include <cpuid.h> // GCC/Clang
+#include "../utils/utils.c"
 
-
-#ifndef ALIGNMENT_SIZE
-    #define ALIGNMENT_SIZE 8
-#endif
+#define ALIGNMENT_SIZE 8
 
 int supports_avx() {
     unsigned int eax, ebx, ecx, edx;
@@ -54,7 +52,7 @@ float dot_ps_128(float* a, float* b, size_t size) {
         sum_acc = _mm_add_ps(sum_acc, prod);
     }
 
-    float* result = aligned_alloc(8, pack_size * sizeof(float));
+    float* result = aligned_allocate_buffer(ALIGNMENT_SIZE, sizeof(float), pack_size);
     _mm_store_ps(result, sum_acc);
 
     float final_result = 0;
@@ -137,7 +135,7 @@ float dot_ps_256(float* a, float* b, size_t size) {
         sum_acc = _mm256_add_ps(sum_acc, prod);
     }
 
-    float* result = aligned_alloc(ALIGNMENT_SIZE, pack_size * sizeof(float)); // Make sure this is cache aligned, otherwise it throws segfault
+    float* result = aligned_allocate_buffer(ALIGNMENT_SIZE, sizeof(float), pack_size); // Make sure this is cache aligned, otherwise it throws segfault
     _mm256_store_ps(result, sum_acc);
 
     float final_result = 0;
@@ -168,7 +166,7 @@ float dot_ps_512(float* a, float* b, size_t size) {
         sum_acc = _mm512_add_ps(sum_acc, prod);
     }
 
-    float* result = aligned_alloc(ALIGNMENT_SIZE, pack_size);
+    float* result = aligned_allocate_buffer(ALIGNMENT_SIZE, sizeof(float), pack_size);
     _mm512_store_ps(result, sum_acc);
 
     float final_result = 0;
@@ -209,7 +207,7 @@ void matmul_single_thread(float* A, float* B_t, float* C, int M, int K, int N) {
 }
 
 void matmul_avx_optimized(float* A, float* B_t, float* C, int M, int K, int N) {
-    float* temp = aligned_alloc(ALIGNMENT_SIZE, 8);
+    float* temp = aligned_allocate_buffer(ALIGNMENT_SIZE, sizeof(float), 8);
     for (int i = 0; i < M; ++i) {
         for (int j = 0; j < N; ++j) {
             __m256 sum = _mm256_setzero_ps();
@@ -227,7 +225,7 @@ void matmul_avx_optimized(float* A, float* B_t, float* C, int M, int K, int N) {
 }
 
 void matmul_avx_optimized_loop_unrolling(float* A, float* B_t, float* C, int M, int K, int N) {
-    float* temp = aligned_alloc(ALIGNMENT_SIZE, 8 * sizeof(float));
+    float* temp = aligned_allocate_buffer(ALIGNMENT_SIZE, sizeof(float), 8);
     for (int i = 0; i < M; ++i) {
         for (int j = 0; j < N; ++j) {
             __m256 sum1 = _mm256_setzero_ps();
@@ -252,7 +250,7 @@ void matmul_avx_optimized_loop_unrolling(float* A, float* B_t, float* C, int M, 
 
 #ifdef __AVX512F__
 void matmul_avx_512_optimized_loop_unrolling(float* A, float* B_t, float* C, int M, int K, int N) {
-    float* temp = aligned_alloc(ALIGNMENT_SIZE, 16 * sizeof(float));
+    float* temp = aligned_allocate_buffer(ALIGNMENT_SIZE, sizeof(float), 16);
     for (int i = 0; i < M; ++i) {
         for (int j = 0; j < N; ++j) {
             __m512 sum1 = _mm512_setzero_ps();
@@ -281,7 +279,7 @@ void matmul_avx_512_optimized_loop_unrolling(float* A, float* B_t, float* C, int
 int main() {
     // Test data
     size_t length = 5000000; // Large vector size for benchmarking
-    float* a = aligned_alloc(ALIGNMENT_SIZE, length * sizeof(float));
+    float* a = aligned_allocate_buffer(ALIGNMENT_SIZE, sizeof(float), length);
     
     for (size_t i = 0; i < length; i++)
         a[i] = 1.0;
