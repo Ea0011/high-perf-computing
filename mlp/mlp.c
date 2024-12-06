@@ -3,8 +3,17 @@
 #include <time.h>
 #include <immintrin.h>
 #include "../utils/utils.c"
+#include <omp.h>
 
-#define ALIGNMENT_SIZE 32
+#define ALIGNMENT_SIZE 8
+
+
+double get_time() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts); // Use CLOCK_MONOTONIC for wall-clock time
+    return ts.tv_sec + ts.tv_nsec * 1e-9;
+}
+
 
 void transpose_matrix(float* B, float* B_t, int K, int N) {
     for (int i = 0; i < K; ++i) {
@@ -22,6 +31,21 @@ void matmul_single_thread(float* A, float* B_t, float* C, int M, int K, int N) {
                 sum += A[i * K + k] + B_t[j * K + k];
             }
             C[i * N + j] = sum;
+        }
+    }
+}
+
+void matmul_parallel_simd(float* A, float* B_t, float* C, float* bias, int M, int K, int N) {
+    for (int i = 0; i < M; ++i) {
+        #pragma omp parallel for num_threads(4) schedule(static)
+        for (int j = 0; j < N; ++j) {
+            float sum = bias[j];
+
+            #pragma omp simd reduction(+: sum)
+            for (int k = 0; k < K; k += 1) {
+                sum += A[i * K + k] + B_t[j * K + k];
+            }
+            C[i * N + j] = (sum) > 0 ? (sum) : 0;
         }
     }
 }
@@ -143,6 +167,37 @@ void mlp(
     free(temp);
 }
 
+void mlp_multithread_simd(
+    float* input,
+    float* input_layer_weights,
+    float* weights,
+    float* biases,
+    float* output_layer_weights,
+    float* output,
+    int batch_size,
+    int num_layers,
+    int input_dim,
+    int output_dim,
+    int hidden_size
+) {
+    float* x = aligned_allocate_buffer(ALIGNMENT_SIZE, sizeof(float), batch_size * hidden_size);
+    float* temp = aligned_allocate_buffer(ALIGNMENT_SIZE, sizeof(float), batch_size * hidden_size);
+
+    matmul_single_thread(input, input_layer_weights, x, batch_size, input_dim, hidden_size);
+    for (int l = 0; l < num_layers; ++l) {
+        int layer_offset = l * hidden_size * hidden_size;
+        int bias_offset = l * hidden_size;
+
+        matmul_parallel_simd(x, &weights[layer_offset], temp, &biases[bias_offset], batch_size, hidden_size, hidden_size);
+        float* swap = x;
+        x = temp;
+        temp = swap;
+    }
+
+    matmul_single_thread(x, output_layer_weights, output, batch_size, hidden_size, output_dim);
+    free(temp);
+}
+
 void mlp_avx(
     float* input,
     float* input_layer_weights,
@@ -191,7 +246,7 @@ double measure_execution_time(
     int output_dim,
     int hidden_size
 ) {
-    clock_t start = clock();
+    double start = get_time();
     mlp_func(
         input,
         embed_layer,
@@ -205,14 +260,14 @@ double measure_execution_time(
         output_dim,
         hidden_size
     );
-    clock_t end = clock();
-    return (double)(end - start) / CLOCKS_PER_SEC;
+    double end = get_time();
+    return end - start;
 }
 
 
 int main() {
     // Define layer sizes
-    int B = 1024;
+    int B = 1;
     int input_dim = 768;
     int output_dim = 32000;
     int hidden_size = 2048;
@@ -269,8 +324,24 @@ int main() {
         hidden_size
     );
 
+    double parallel_simd_time = measure_execution_time(
+        mlp_multithread_simd,
+        input,
+        embed_layer,
+        weights,
+        biases,
+        output_layer,
+        output,
+        B,
+        num_layers,
+        input_dim,
+        output_dim,
+        hidden_size
+    );
+
     printf("AVX-optimized MLP execution time: %f seconds\n", avx_time);
     printf("Single-threaded MLP execution time: %f seconds\n", single_thread_time);
+    printf("Multi-threaded MLP execution time: %f seconds\n", parallel_simd_time);
 
     free(input);
     free(weights);

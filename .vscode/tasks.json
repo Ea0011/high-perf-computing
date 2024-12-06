@@ -38,7 +38,29 @@
           "kind": "build",
           "isDefault": true
         }
+      },
+      {
+        "label": "Build with AVX2, FMA, OMP (Perf)",
+        "type": "shell",
+        "command": "clang",
+        "args": [
+            "-Xpreprocessor",
+            "-fopenmp",
+            "-I/usr/local/opt/libomp/include",
+            "-L/usr/local/opt/libomp/lib",
+            "-lomp",
+            "-mavx2",
+            "-mfma",
+            "-Ofast",
+            "-o", "${workspaceFolder}/mlp/mlp.o",
+            "${workspaceFolder}/mlp/mlp.c"
+        ],
+        "problemMatcher": ["$gcc"],
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        }
       }
     ]
-  }
+}
   
