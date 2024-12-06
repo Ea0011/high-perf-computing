@@ -112,6 +112,7 @@ void mlp_forward(
     // Hidden layers
     for (int l = 0; l < num_layers; ++l) {
         int layer_offset = l * hidden_size * hidden_size;
+        int bias_offset = l * hidden_size;
 
         if (use_avx) {
             matmul_avx_optimized_loop_unrolling(x, &weights[layer_offset], temp, batch_size, hidden_size, hidden_size);
@@ -122,7 +123,7 @@ void mlp_forward(
         // Add biases and apply activation function
         for (int i = 0; i < batch_size; ++i) {
             for (int j = 0; j < hidden_size; ++j) {
-                temp[i * hidden_size + j] += biases[layer_offset + j];
+                temp[i * hidden_size + j] += biases[bias_offset + j];
             }
         }
         relu(temp, batch_size * hidden_size);
@@ -205,8 +206,10 @@ int main() {
     initialize_matrix(input, B, input_dim);
     for (int l = 0; l < num_layers; l++) {
         int layer_offset = l * hidden_size * hidden_size;
+        int bias_offset = l * hidden_size;
+
         initialize_matrix(&weights[layer_offset], hidden_size, hidden_size);
-        initialize_matrix(&biases[layer_offset], 1, hidden_size);
+        initialize_matrix(&biases[bias_offset], 1, hidden_size);
     }
     initialize_matrix(output_layer, B, output_dim);
 
