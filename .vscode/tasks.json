@@ -6,15 +6,20 @@
         "type": "shell",
         "command": "clang",
         "args": [
-          "-o", "${workspaceFolder}/mlp/mlp.o",
-          "${workspaceFolder}/mlp/mlp.c",
-          "-mavx2",
-          "-mfma",
-          "-g",          // Enables debug symbols
-          "-O0",         // Disables optimizations for easier debugging
-          "-Wall",       // Enables all warnings
-          "-Wextra",     // Enables extra warnings
-          "-Wpedantic"   // Enables strict compliance to the standard
+            "-Xpreprocessor",
+            "-fopenmp",
+            "-I/usr/local/opt/libomp/include",
+            "-L/usr/local/opt/libomp/lib",
+            "-lomp",
+            "-o", "${workspaceFolder}/mlp/mlp.o",
+            "${workspaceFolder}/mlp/mlp.c",
+            "-mavx2",
+            "-mfma",
+            "-g",          // Enables debug symbols
+            "-O0",         // Disables optimizations for easier debugging
+            "-Wall",       // Enables all warnings
+            "-Wextra",     // Enables extra warnings
+            "-Wpedantic"   // Enables strict compliance to the standard
         ],
         "problemMatcher": ["$gcc"],
         "group": {
