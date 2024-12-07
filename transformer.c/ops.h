@@ -135,14 +135,19 @@ void single_head_attention(
     float* attn_matrix, // Output of attention, matrix of shape (n, n)
     float* out, // Output of head attention, matrix of shape (n, dim_head)
     int n,     // Sequence length
-    int dim_head // Dimension of the head
+    int dim_head, // Dimension of the head
+    int causal
 ) {
     matmul(Q, K, attn_matrix, n, dim_head, n);
 
     float scale = 1.0f / sqrtf(dim_head);
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
-            attn_matrix[i * n + j] *= scale;
+            if (causal && i < j) {
+                attn_matrix[i * n + j] = -INFINITY;
+            } else {
+                attn_matrix[i * n + j] *= scale;
+            }
         }
     }
     for (int i = 0; i < n; i++) {
