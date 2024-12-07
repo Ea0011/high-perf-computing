@@ -1,34 +1,25 @@
 #include "ops.h"
 #include "stdio.h"
+#include "model.h"
+#include <stdio.h>
 
 int main() {
-    // testing matmul
+    ModelConfig cfg = read_config_from_file("gpt2_small.bin");
+    Model* model = (Model*)malloc(sizeof(Model));
 
-    float X[4] = {1, 2, 3, 4};
-    float W[4] = {1, 2, 3, 4};
-    float out[1] = {0};
+    zero_init_model_from_config(model, cfg);
 
-    matmul(X, W, out, 1, 4, 1);
+    // go over all the model and verify the initialization
+    printf("%f\n", model->Embedding[0]);
+    printf("%f\n", model->Embedding[cfg.vocab_size * cfg.d_model]);
 
-    // print out
-    for (int i = 0; i < 1; i++) {
-        printf("%f\n", out[i]);
+    int layer = 0;
+    for (; layer < cfg.num_layers; layer++) {
+        printf("%f\n", model->Blocks[layer].AttnBlock->attn_norm_alpha[0]);
+        printf("%f\n", model->Blocks[layer].AttnBlock->attn_norm_alpha[cfg.d_model]);
+
+        printf("%f\n", model->Blocks[layer].AttnBlock->wq[0]);
+        printf("%f\n", model->Blocks[layer].AttnBlock->wq[cfg.num_heads * cfg.d_model * cfg.head_dim]);
     }
-
-    // testing softmax
-
-    softmax(X, 4);
-
-    // print X
-    for (int i = 0; i < 4; i++) {
-        printf("%f\n", X[i]);
-    }
-
-    // check if sum is 1
-    float sum = 0;
-    for (int i = 0; i < 4; i++) {
-        sum += X[i];
-    }
-    printf("sum: %f\n", sum);
     return 0;
 }
