@@ -25,7 +25,7 @@ int test_attn() {
     float out[n * dim_head];
 
     // Call the single head attention function
-    single_head_attention(Q, K, V, attn_matrix, out, n, dim_head);
+    single_head_attention(Q, K, V, attn_matrix, out, n, dim_head, 0);
 
     // Test cases to check
     for (int i = 0; i < n * n; i++) {
