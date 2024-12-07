@@ -75,7 +75,7 @@ void softmax(float* X, int n) {
     }
 }
 
-void layernorm(float* X, float alpha, float betta, float eps, int n) {
+void layernorm(float* X, float* alpha, float* betta, float eps, int n) {
     /*
         Layer normalization applied to X.
     */
@@ -90,7 +90,7 @@ void layernorm(float* X, float alpha, float betta, float eps, int n) {
     }
     float std = sqrtf(sum / n + eps);
     for (int i = 0; i < n; i++) {
-        X[i] = alpha * (X[i] - mean) / std + betta;
+        X[i] = alpha[i] * (X[i] - mean) / std + betta[i];
     }
 }
 
