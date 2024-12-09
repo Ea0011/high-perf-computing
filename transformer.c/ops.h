@@ -75,7 +75,7 @@ void softmax(float* X, int n) {
     }
 }
 
-void layernorm(float* X, float* alpha, float* betta, float eps, int n) {
+void layernorm(float* X, float* alpha, float* betta, float* out, int n) {
     /*
         Layer normalization applied to X.
     */
@@ -88,9 +88,9 @@ void layernorm(float* X, float* alpha, float* betta, float eps, int n) {
     for (int i = 0; i < n; i++) {
         sum += (X[i] - mean) * (X[i] - mean);
     }
-    float std = sqrtf(sum / n + eps);
+    float std = sqrtf(sum / n);
     for (int i = 0; i < n; i++) {
-        X[i] = alpha[i] * (X[i] - mean) / std + betta[i];
+        out[i] = alpha[i] * (X[i] - mean) / (std + 1e-8) + betta[i];
     }
 }
 
@@ -134,27 +134,23 @@ void single_head_attention(
     float* V, // Matrix of shape (n, dim_head)
     float* attn_matrix, // Output of attention, matrix of shape (n, n)
     float* out, // Output of head attention, matrix of shape (n, dim_head)
-    int n,     // Sequence length
+    int pos,     // Sequence length
     int dim_head, // Dimension of the head
     int causal
 ) {
-    matmul(Q, K, attn_matrix, n, dim_head, n);
+    matmul(Q, K, attn_matrix, 1, dim_head, pos);
 
     float scale = 1.0f / sqrtf(dim_head);
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            if (causal && i < j) {
-                attn_matrix[i * n + j] = -INFINITY;
-            } else {
-                attn_matrix[i * n + j] *= scale;
-            }
+    for (int i = 0; i < pos; i++) {
+        for (int j = 0; j < pos; j++) {
+            attn_matrix[i * pos + j] *= scale;
         }
     }
-    for (int i = 0; i < n; i++) {
-        softmax(attn_matrix + i * n, n);
+    for (int i = 0; i < pos; i++) {
+        softmax(attn_matrix + i * pos, pos);
     }
 
-    matmul(attn_matrix, V, out, n, n, dim_head);
+    matmul(attn_matrix, V, out, pos, pos, dim_head);
 }
 
 

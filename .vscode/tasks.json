@@ -2,6 +2,42 @@
     "version": "2.0.0",
     "tasks": [
       {
+        "label": "Build transformer (Debug)",
+        "type": "shell",
+        "command": "clang",
+        "args": [
+            "-o", "${workspaceFolder}/transformer.c/build/run.o",
+            "${workspaceFolder}/transformer.c/run.c",
+            "-g",          // Enables debug symbols
+            "-O0",         // Disables optimizations for easier debugging
+            "-Wall",       // Enables all warnings
+            "-Wextra",     // Enables extra warnings
+            "-Wpedantic"   // Enables strict compliance to the standard
+        ],
+        "problemMatcher": ["$gcc"],
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        }
+      },
+      {
+        "label": "Build transformer single thread fast",
+        "type": "shell",
+        "command": "clang",
+        "args": [
+            "-o", "${workspaceFolder}/transformer.c/build/run_fast.o",
+            "${workspaceFolder}/transformer.c/run.c",
+            "-mavx2",
+            "-mfma",
+            "-Ofast"
+        ],
+        "problemMatcher": ["$gcc"],
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        }
+      },
+      {
         "label": "Build with AVX2 and FMA (Debug)",
         "type": "shell",
         "command": "clang",
