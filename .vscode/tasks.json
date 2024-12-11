@@ -4,7 +4,7 @@
       {
         "label": "Build transformer (Debug)",
         "type": "shell",
-        "command": "clang",
+        "command": "gcc",
         "args": [
             "-o", "${workspaceFolder}/transformer.c/build/run.o",
             "${workspaceFolder}/transformer.c/run.c",
@@ -12,7 +12,8 @@
             "-O0",         // Disables optimizations for easier debugging
             "-Wall",       // Enables all warnings
             "-Wextra",     // Enables extra warnings
-            "-Wpedantic"   // Enables strict compliance to the standard
+            "-Wpedantic",  // Enables strict compliance to the standard
+            "-lm"          // Links the math library
         ],
         "problemMatcher": ["$gcc"],
         "group": {
@@ -23,13 +24,14 @@
       {
         "label": "Build transformer single thread fast",
         "type": "shell",
-        "command": "clang",
+        "command": "gcc",
         "args": [
             "-o", "${workspaceFolder}/transformer.c/build/run_fast.o",
             "${workspaceFolder}/transformer.c/run.c",
             "-mavx2",
             "-mfma",
-            "-Ofast"
+            "-Ofast",
+            "-lm"          // Links the math library
         ],
         "problemMatcher": ["$gcc"],
         "group": {

@@ -76,17 +76,17 @@ void zero_init_model_from_config(Model* model, ModelConfig cfg) {
 void radom_init_model_from_config(Model* model, ModelConfig cfg) {
     model->Embedding = (float*)calloc(cfg.vocab_size * cfg.d_model, sizeof(float));
     for (int i = 0; i < cfg.vocab_size * cfg.d_model; i++) {
-        model->Embedding[i] = (float)rand() / (RAND_MAX) * 0.001;
+        model->Embedding[i] = (float)rand() / (RAND_MAX) * 0.01;
     }
 
     model->PositionalEncoding = (float*)calloc(cfg.max_context_len * cfg.d_model, sizeof(float));
     for (int i = 0; i < cfg.max_context_len * cfg.d_model; i++) {
-        model->PositionalEncoding[i] = (float)rand() / (RAND_MAX) * 0.001;
+        model->PositionalEncoding[i] = (float)rand() / (RAND_MAX) * 0.01;
     }
 
     model->UnEmbedding = (float*)calloc(cfg.d_model * cfg.vocab_size, sizeof(float));
     for (int i = 0; i < cfg.d_model * cfg.vocab_size; i++) {
-        model->UnEmbedding[i] = (float)rand() / (RAND_MAX) * 0.001;
+        model->UnEmbedding[i] = (float)rand() / (RAND_MAX) * 0.01;
     }
 
     model->Blocks = (TransformerBlock*)calloc(cfg.num_layers, sizeof(TransformerBlock));
@@ -112,24 +112,24 @@ void radom_init_model_from_config(Model* model, ModelConfig cfg) {
         model->Blocks[i].AttnBlock->wo = (float*)calloc(cfg.d_model * cfg.d_model, sizeof(float));
 
         for (int j = 0; j < cfg.num_heads * cfg.d_model * cfg.head_dim; j++) {
-            model->Blocks[i].AttnBlock->wq[j] = (float)rand() / (RAND_MAX) * 0.001;
-            model->Blocks[i].AttnBlock->wk[j] = (float)rand() / (RAND_MAX) * 0.001;
-            model->Blocks[i].AttnBlock->wv[j] = (float)rand() / (RAND_MAX) * 0.001;
+            model->Blocks[i].AttnBlock->wq[j] = (float)rand() / (RAND_MAX) * 0.01;
+            model->Blocks[i].AttnBlock->wk[j] = (float)rand() / (RAND_MAX) * 0.01;
+            model->Blocks[i].AttnBlock->wv[j] = (float)rand() / (RAND_MAX) * 0.01;
         }
 
         for (int j = 0; j < cfg.d_model * cfg.d_model; j++) {
-            model->Blocks[i].AttnBlock->wo[j] = (float)rand() / (RAND_MAX) * 0.001;
+            model->Blocks[i].AttnBlock->wo[j] = (float)rand() / (RAND_MAX) * 0.01;
         }
 
         model->Blocks[i].FFNBlock->w_up = (float*)calloc(cfg.d_model * cfg.hidden_size, sizeof(float));
         model->Blocks[i].FFNBlock->w_down = (float*)calloc(cfg.hidden_size * cfg.d_model, sizeof(float));
 
         for (int j = 0; j < cfg.d_model * cfg.hidden_size; j++) {
-            model->Blocks[i].FFNBlock->w_up[j] = (float)rand() / (RAND_MAX) * 0.001;
+            model->Blocks[i].FFNBlock->w_up[j] = (float)rand() / (RAND_MAX) * 0.01;
         }
 
         for (int j = 0; j < cfg.hidden_size * cfg.d_model; j++) {
-            model->Blocks[i].FFNBlock->w_down[j] = (float)rand() / (RAND_MAX) * 0.001;
+            model->Blocks[i].FFNBlock->w_down[j] = (float)rand() / (RAND_MAX) * 0.01;
         }
     }
 
@@ -181,15 +181,15 @@ RunState* initialize_runstate(ModelConfig cfg) {
     s->x_ffn_down = (float*)calloc(cfg.d_model, sizeof(float));
     s->x_ffn_up = (float*)calloc(cfg.hidden_size, sizeof(float)); // GPT2 uses 4x hidden size for the FFN layer
 
-    // Attention cache, (position, layer, head, dim_head)
-    s->k_cache = (float*)calloc(cfg.max_context_len * cfg.num_layers * cfg.num_heads * cfg.head_dim, sizeof(float));
-    s->v_cache = (float*)calloc(cfg.max_context_len * cfg.num_layers * cfg.num_heads * cfg.head_dim, sizeof(float));
+    // Attention cache, (layer, head, position, dim_head)
+    s->k_cache = (float*)calloc(cfg.num_layers * cfg.num_heads * cfg.max_context_len * cfg.head_dim, sizeof(float));
+    s->v_cache = (float*)calloc(cfg.num_layers * cfg.num_heads * cfg.max_context_len * cfg.head_dim, sizeof(float));
 
     // Attention matrices
     s->q = (float*)calloc(cfg.head_dim, sizeof(float));
     // These three are a bit special, they hold all Keys, Values, and attention outputs for all heads
-    s->k = (float*)calloc(cfg.d_model, sizeof(float));
-    s->v = (float*)calloc(cfg.d_model, sizeof(float));
+    s->k = (float*)calloc(cfg.head_dim, sizeof(float));
+    s->v = (float*)calloc(cfg.head_dim, sizeof(float));
     s->attn_weights = (float*)calloc(cfg.max_context_len, sizeof(float));
     s->attn_out = (float*)calloc(cfg.d_model, sizeof(float));
 
@@ -228,14 +228,14 @@ int forward(
             matmul(s->x_norm, model->Blocks[l].AttnBlock->wk + h * cfg.d_model * cfg.head_dim, s->k, 1, cfg.d_model, cfg.head_dim);
             matmul(s->x_norm, model->Blocks[l].AttnBlock->wv + h * cfg.d_model * cfg.head_dim, s->v, 1, cfg.d_model, cfg.head_dim);
 
-            // Put the values and keys into the cache (position, layer, head, dim_head)
-            memcpy(s->k_cache + s->position * cfg.num_layers * cfg.num_heads * cfg.head_dim + l * cfg.num_heads * cfg.head_dim + h * cfg.head_dim, s->k, cfg.head_dim * sizeof(float));
-            memcpy(s->v_cache + s->position * cfg.num_layers * cfg.num_heads * cfg.head_dim + l * cfg.num_heads * cfg.head_dim + h * cfg.head_dim, s->v, cfg.head_dim * sizeof(float));
-
+            // Put the values and keys into the cache (layer, head, position, dim_head)
+            memcpy(s->k_cache + l * cfg.num_heads * cfg.max_context_len * cfg.head_dim + h * cfg.max_context_len * cfg.head_dim + s->position * cfg.head_dim, s->k, cfg.head_dim * sizeof(float));
+            memcpy(s->v_cache + l * cfg.num_heads * cfg.max_context_len * cfg.head_dim + h * cfg.max_context_len * cfg.head_dim + s->position * cfg.head_dim, s->v, cfg.head_dim * sizeof(float));
+            
             single_head_attention(
                 s->q,
-                s->k_cache + s->position * cfg.num_layers * cfg.num_heads * cfg.head_dim + l * cfg.num_heads * cfg.head_dim + h * cfg.head_dim,
-                s->v_cache + s->position * cfg.num_layers * cfg.num_heads * cfg.head_dim + l * cfg.num_heads * cfg.head_dim + h * cfg.head_dim,
+                s->k_cache + l * cfg.num_heads * cfg.max_context_len * cfg.head_dim + h * cfg.max_context_len * cfg.head_dim,
+                s->v_cache + l * cfg.num_heads * cfg.max_context_len * cfg.head_dim + h * cfg.max_context_len * cfg.head_dim,
                 s->attn_weights,
                 s->attn_out + h * cfg.head_dim,
                 s->position + 1,

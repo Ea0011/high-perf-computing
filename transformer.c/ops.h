@@ -29,6 +29,22 @@ void vector_sum(float* X1, float* X2, int d) {
     }
 }
 
+void matmul_transpose(float* X, float* W, float* out, int n, int d, int h) {
+    /*
+        Matrix multiplication of X and W^T, storing the result in out.
+        X has shape (n, d), W has shape (h, d), and out has shape (n, h).
+    */
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < h; j++) {
+            float sum = 0;
+            for (int k = 0; k < d; k++) {
+                sum += X[i * d + k] * W[j * d + k];
+            }
+            out[i * h + j] = sum;
+        }
+    }
+}
+
 void matmul(float* X, float* W, float* out, int n, int d, int h) {
     /*
         Matrix multiplication of X and W, storing the result in out.
@@ -52,6 +68,15 @@ void gelu(float* X, int n) {
     */
     for (int i = 0; i < n; i++) {
         X[i] = 0.5 * X[i] * (1 + tanhf(0.79788456 * (X[i] + 0.044715 * X[i] * X[i] * X[i])));
+    }
+}
+
+void relu(float* X, int n) {
+    /*
+        ReLU activation function applied to X.
+    */
+    for (int i = 0; i < n; i++) {
+        X[i] = X[i] > 0 ? X[i] : 0;
     }
 }
 
@@ -129,28 +154,38 @@ int sample_argmax(float* X, int n) {
 
 // -------- Transformer Operations --------
 void single_head_attention(
-    float* Q, // Matrix of shape (n, dim_head)
+    float* Q, // Matrix of shape (1, dim_head)
     float* K, // Matrix of shape (n, dim_head)
     float* V, // Matrix of shape (n, dim_head)
-    float* attn_matrix, // Output of attention, matrix of shape (n, n)
+    float* attn_matrix, // Output of attention, matrix of shape (1, n)
     float* out, // Output of head attention, matrix of shape (n, dim_head)
     int pos,     // Sequence length
     int dim_head, // Dimension of the head
     int causal
 ) {
-    matmul(Q, K, attn_matrix, 1, dim_head, pos);
+    matmul_transpose(Q, K, attn_matrix, 1, dim_head, pos);
+
+    // for this to work the cache needs to be stored as to easily retrieve (pos, dim_head) values from the cache
+    // Example struct to store kv cache
+   
+    // array[layer][head][pos][dimension]
 
     float scale = 1.0f / sqrtf(dim_head);
     for (int i = 0; i < pos; i++) {
-        for (int j = 0; j < pos; j++) {
-            attn_matrix[i * pos + j] *= scale;
-        }
+        attn_matrix[i] *= scale;
     }
     for (int i = 0; i < pos; i++) {
-        softmax(attn_matrix + i * pos, pos);
+        softmax(attn_matrix, pos);
     }
 
-    matmul(attn_matrix, V, out, pos, pos, dim_head);
+    // linearly combine V with attn_matrix into out
+    for (int i = 0; i < dim_head; i++) {
+        float sum = 0;
+        for (int j = 0; j < pos; j++) {
+            sum += attn_matrix[j] * V[j * dim_head + i];
+        }
+        out[i] = sum;
+    }
 }
 
 
@@ -168,6 +203,6 @@ void mlp(
         MLP layer applied to X.
     */
     matmul(X, W_up, out_up, n, d_model, hidden_size);
-    gelu(out_up, n * hidden_size);
+    gelu(out_up, hidden_size);
     matmul(out_up, W_down, out_down, n, hidden_size, d_model);
 }
