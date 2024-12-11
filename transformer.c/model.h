@@ -73,20 +73,20 @@ void zero_init_model_from_config(Model* model, ModelConfig cfg) {
     }
 }
 
-void radom_init_model_from_config(Model* model, ModelConfig cfg) {
+void radom_init_model_from_config(Model* model, ModelConfig cfg, float scale) {
     model->Embedding = (float*)calloc(cfg.vocab_size * cfg.d_model, sizeof(float));
     for (int i = 0; i < cfg.vocab_size * cfg.d_model; i++) {
-        model->Embedding[i] = (float)rand() / (RAND_MAX) * 0.01;
+        model->Embedding[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
     }
 
     model->PositionalEncoding = (float*)calloc(cfg.max_context_len * cfg.d_model, sizeof(float));
     for (int i = 0; i < cfg.max_context_len * cfg.d_model; i++) {
-        model->PositionalEncoding[i] = (float)rand() / (RAND_MAX) * 0.01;
+        model->PositionalEncoding[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
     }
 
     model->UnEmbedding = (float*)calloc(cfg.d_model * cfg.vocab_size, sizeof(float));
     for (int i = 0; i < cfg.d_model * cfg.vocab_size; i++) {
-        model->UnEmbedding[i] = (float)rand() / (RAND_MAX) * 0.01;
+        model->UnEmbedding[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
     }
 
     model->Blocks = (TransformerBlock*)calloc(cfg.num_layers, sizeof(TransformerBlock));
@@ -112,24 +112,24 @@ void radom_init_model_from_config(Model* model, ModelConfig cfg) {
         model->Blocks[i].AttnBlock->wo = (float*)calloc(cfg.d_model * cfg.d_model, sizeof(float));
 
         for (int j = 0; j < cfg.num_heads * cfg.d_model * cfg.head_dim; j++) {
-            model->Blocks[i].AttnBlock->wq[j] = (float)rand() / (RAND_MAX) * 0.01;
-            model->Blocks[i].AttnBlock->wk[j] = (float)rand() / (RAND_MAX) * 0.01;
-            model->Blocks[i].AttnBlock->wv[j] = (float)rand() / (RAND_MAX) * 0.01;
+            model->Blocks[i].AttnBlock->wq[j] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
+            model->Blocks[i].AttnBlock->wk[j] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
+            model->Blocks[i].AttnBlock->wv[j] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
         }
 
         for (int j = 0; j < cfg.d_model * cfg.d_model; j++) {
-            model->Blocks[i].AttnBlock->wo[j] = (float)rand() / (RAND_MAX) * 0.01;
+            model->Blocks[i].AttnBlock->wo[j] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
         }
 
         model->Blocks[i].FFNBlock->w_up = (float*)calloc(cfg.d_model * cfg.hidden_size, sizeof(float));
         model->Blocks[i].FFNBlock->w_down = (float*)calloc(cfg.hidden_size * cfg.d_model, sizeof(float));
 
         for (int j = 0; j < cfg.d_model * cfg.hidden_size; j++) {
-            model->Blocks[i].FFNBlock->w_up[j] = (float)rand() / (RAND_MAX) * 0.01;
+            model->Blocks[i].FFNBlock->w_up[j] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
         }
 
         for (int j = 0; j < cfg.hidden_size * cfg.d_model; j++) {
-            model->Blocks[i].FFNBlock->w_down[j] = (float)rand() / (RAND_MAX) * 0.01;
+            model->Blocks[i].FFNBlock->w_down[j] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
         }
     }
 
@@ -274,7 +274,7 @@ int forward(
         vector_sum(s->x, s->x_ffn_down, cfg.d_model);
     }
     matmul(s->x, model->UnEmbedding, s->logits, 1, cfg.d_model, cfg.vocab_size);
-    int next_token = sample_argmax(s->logits, cfg.vocab_size);
+    int next_token = multinomial_sample(s->logits, cfg.vocab_size);
     
     return next_token;
 }

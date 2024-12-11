@@ -21,7 +21,7 @@ int main() {
     ModelConfig cfg = read_config_from_file("gpt2_small.bin");
     Model* model = (Model*)malloc(sizeof(Model));
 
-    radom_init_model_from_config(model, cfg);
+    radom_init_model_from_config(model, cfg, 0.02);
     generate(cfg, model);
     return 0;
 }
