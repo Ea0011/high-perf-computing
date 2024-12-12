@@ -29,6 +29,22 @@ void vector_sum(float* X1, float* X2, int d) {
     }
 }
 
+void fused_matmul_bias_transpose(float* X, float* W, float* b, float* out, int n, int d, int h) {
+    /*
+        Matrix multiplication of X and W^T, storing the result in out.
+        X has shape (n, d), W has shape (h, d), and out has shape (n, h).
+    */
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < h; j++) {
+            float sum = 0;
+            for (int k = 0; k < d; k++) {
+                sum += X[i * d + k] * W[j * d + k] + b[j];
+            }
+            out[i * h + j] = sum;
+        }
+    }
+}
+
 void matmul_transpose(float* X, float* W, float* out, int n, int d, int h) {
     /*
         Matrix multiplication of X and W^T, storing the result in out.
@@ -39,6 +55,23 @@ void matmul_transpose(float* X, float* W, float* out, int n, int d, int h) {
             float sum = 0;
             for (int k = 0; k < d; k++) {
                 sum += X[i * d + k] * W[j * d + k];
+            }
+            out[i * h + j] = sum;
+        }
+    }
+}
+
+void fused_matmul_bias(float* X, float* W, float* b, float* out, int n, int d, int h) {
+    /*
+        Matrix multiplication of X and W, storing the result in out.
+        Fuses bias addition in one function
+        X has shape (n, d), W has shape (d, h), and out has shape (n, h).
+    */
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < h; j++) {
+            float sum = 0;
+            for (int k = 0; k < d; k++) {
+                sum += X[i * d + k] * W[k * h + j] + b[j];
             }
             out[i * h + j] = sum;
         }
@@ -192,7 +225,9 @@ void single_head_attention(
 void mlp(
     float* X,
     float* W_up,
+    float* b_up,
     float* W_down,
+    float* b_down,
     float* out_up,
     float* out_down,
     int n,
@@ -202,7 +237,7 @@ void mlp(
     /*
         MLP layer applied to X.
     */
-    matmul(X, W_up, out_up, n, d_model, hidden_size);
+    fused_matmul_bias(X, W_up, b_up, out_up, n, d_model, hidden_size);
     gelu(out_up, hidden_size);
-    matmul(out_up, W_down, out_down, n, hidden_size, d_model);
+    fused_matmul_bias(out_up, W_down, b_down, out_down, n, hidden_size, d_model);
 }

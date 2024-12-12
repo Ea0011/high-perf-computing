@@ -6,16 +6,22 @@ typedef struct {
     float* attn_norm_alpha;
     float* attn_norm_betta;
     float* wq;
+    float* wq_bias;
     float* wk;
+    float* wk_bias;
     float* wv;
+    float* wv_bias;
     float* wo;
+    float* wo_bias;
 } AttentionBlock;
 
 typedef struct {
     float* ffn_norm_alpha;
     float* ffn_norm_betta;
     float* w_up;
+    float* w_up_bias;
     float* w_down;
+    float* w_down_bias;
 } FeedForwardBlock;
 
 typedef struct {
@@ -28,6 +34,7 @@ typedef struct {
     float* PositionalEncoding;
     TransformerBlock* Blocks;
     float* UnEmbedding;
+    float* UnEmbeddingBias;
 } Model;
 
 typedef struct {
@@ -52,6 +59,7 @@ void zero_init_model_from_config(Model* model, ModelConfig cfg) {
     model->Embedding = (float*)calloc(cfg.vocab_size * cfg.d_model, sizeof(float));
     model->PositionalEncoding = (float*)calloc(cfg.max_context_len * cfg.d_model, sizeof(float));
     model->UnEmbedding = (float*)calloc(cfg.d_model * cfg.vocab_size, sizeof(float));
+    model->UnEmbeddingBias = (float*)calloc(cfg.vocab_size, sizeof(float));
     model->Blocks = (TransformerBlock*)calloc(cfg.num_layers, sizeof(TransformerBlock));
 
     for (int i = 0; i < cfg.num_layers; i++) {
@@ -64,12 +72,22 @@ void zero_init_model_from_config(Model* model, ModelConfig cfg) {
         model->Blocks[i].FFNBlock->ffn_norm_betta = (float*)calloc(cfg.d_model, sizeof(float));
 
         model->Blocks[i].AttnBlock->wq = (float*)calloc(cfg.num_heads * cfg.d_model * cfg.head_dim, sizeof(float));
+        model->Blocks[i].AttnBlock->wq_bias = (float*)calloc(cfg.num_heads * cfg.head_dim, sizeof(float));
+
         model->Blocks[i].AttnBlock->wk = (float*)calloc(cfg.num_heads * cfg.d_model * cfg.head_dim, sizeof(float));
+        model->Blocks[i].AttnBlock->wk_bias = (float*)calloc(cfg.num_heads * cfg.head_dim, sizeof(float));
+
         model->Blocks[i].AttnBlock->wv = (float*)calloc(cfg.num_heads * cfg.d_model * cfg.head_dim, sizeof(float));
+        model->Blocks[i].AttnBlock->wv_bias = (float*)calloc(cfg.num_heads * cfg.head_dim, sizeof(float));
+
         model->Blocks[i].AttnBlock->wo = (float*)calloc(cfg.d_model * cfg.d_model, sizeof(float));
+        model->Blocks[i].AttnBlock->wo_bias = (float*)calloc(cfg.d_model, sizeof(float));
 
         model->Blocks[i].FFNBlock->w_up = (float*)calloc(cfg.d_model * cfg.hidden_size, sizeof(float));
+        model->Blocks[i].FFNBlock->w_up_bias = (float*)calloc(cfg.hidden_size, sizeof(float));
+
         model->Blocks[i].FFNBlock->w_down = (float*)calloc(cfg.hidden_size * cfg.d_model, sizeof(float));
+        model->Blocks[i].FFNBlock->w_down_bias = (float*)calloc(cfg.d_model, sizeof(float));
     }
 }
 
@@ -85,6 +103,7 @@ void radom_init_model_from_config(Model* model, ModelConfig cfg, float scale) {
     }
 
     model->UnEmbedding = (float*)calloc(cfg.d_model * cfg.vocab_size, sizeof(float));
+    model->UnEmbeddingBias = (float*)calloc(cfg.vocab_size, sizeof(float));
     for (int i = 0; i < cfg.d_model * cfg.vocab_size; i++) {
         model->UnEmbedding[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
     }
@@ -107,9 +126,16 @@ void radom_init_model_from_config(Model* model, ModelConfig cfg, float scale) {
         }
 
         model->Blocks[i].AttnBlock->wq = (float*)calloc(cfg.num_heads * cfg.d_model * cfg.head_dim, sizeof(float));
+        model->Blocks[i].AttnBlock->wq_bias = (float*)calloc(cfg.num_heads * cfg.head_dim, sizeof(float));
+
         model->Blocks[i].AttnBlock->wk = (float*)calloc(cfg.num_heads * cfg.d_model * cfg.head_dim, sizeof(float));
+        model->Blocks[i].AttnBlock->wk_bias = (float*)calloc(cfg.num_heads * cfg.head_dim, sizeof(float));
+
         model->Blocks[i].AttnBlock->wv = (float*)calloc(cfg.num_heads * cfg.d_model * cfg.head_dim, sizeof(float));
+        model->Blocks[i].AttnBlock->wv_bias = (float*)calloc(cfg.num_heads * cfg.head_dim, sizeof(float));
+
         model->Blocks[i].AttnBlock->wo = (float*)calloc(cfg.d_model * cfg.d_model, sizeof(float));
+        model->Blocks[i].AttnBlock->wo_bias = (float*)calloc(cfg.d_model, sizeof(float));
 
         for (int j = 0; j < cfg.num_heads * cfg.d_model * cfg.head_dim; j++) {
             model->Blocks[i].AttnBlock->wq[j] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
@@ -122,7 +148,10 @@ void radom_init_model_from_config(Model* model, ModelConfig cfg, float scale) {
         }
 
         model->Blocks[i].FFNBlock->w_up = (float*)calloc(cfg.d_model * cfg.hidden_size, sizeof(float));
+        model->Blocks[i].FFNBlock->w_up_bias = (float*)calloc(cfg.hidden_size, sizeof(float));
+
         model->Blocks[i].FFNBlock->w_down = (float*)calloc(cfg.hidden_size * cfg.d_model, sizeof(float));
+        model->Blocks[i].FFNBlock->w_down_bias = (float*)calloc(cfg.d_model, sizeof(float));
 
         for (int j = 0; j < cfg.d_model * cfg.hidden_size; j++) {
             model->Blocks[i].FFNBlock->w_up[j] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
@@ -224,9 +253,33 @@ int forward(
 
         // MHA
         for (int h = 0; h < cfg.num_heads; h++) {
-            matmul(s->x_norm, model->Blocks[l].AttnBlock->wq + h * cfg.d_model * cfg.head_dim, s->q, 1, cfg.d_model, cfg.head_dim);
-            matmul(s->x_norm, model->Blocks[l].AttnBlock->wk + h * cfg.d_model * cfg.head_dim, s->k, 1, cfg.d_model, cfg.head_dim);
-            matmul(s->x_norm, model->Blocks[l].AttnBlock->wv + h * cfg.d_model * cfg.head_dim, s->v, 1, cfg.d_model, cfg.head_dim);
+            fused_matmul_bias(
+                s->x_norm,
+                model->Blocks[l].AttnBlock->wq + h * cfg.d_model * cfg.head_dim,
+                model->Blocks[l].AttnBlock->wq_bias + h * cfg.head_dim,
+                s->q,
+                1,
+                cfg.d_model,
+                cfg.head_dim
+            );
+            fused_matmul_bias(
+                s->x_norm,
+                model->Blocks[l].AttnBlock->wk + h * cfg.d_model * cfg.head_dim,
+                model->Blocks[l].AttnBlock->wk_bias + h * cfg.head_dim,
+                s->k,
+                1,
+                cfg.d_model,
+                cfg.head_dim
+            );
+            fused_matmul_bias(
+                s->x_norm,
+                model->Blocks[l].AttnBlock->wv + h * cfg.d_model * cfg.head_dim,
+                model->Blocks[l].AttnBlock->wv_bias + h * cfg.head_dim,
+                s->v,
+                1,
+                cfg.d_model,
+                cfg.head_dim
+            );
 
             // Put the values and keys into the cache (layer, head, position, dim_head)
             memcpy(s->k_cache + l * cfg.num_heads * cfg.max_context_len * cfg.head_dim + h * cfg.max_context_len * cfg.head_dim + s->position * cfg.head_dim, s->k, cfg.head_dim * sizeof(float));
@@ -262,7 +315,9 @@ int forward(
         mlp(
             s->x_norm,
             model->Blocks[l].FFNBlock->w_up,
+            model->Blocks[l].FFNBlock->w_up_bias,
             model->Blocks[l].FFNBlock->w_down,
+            model->Blocks[l].FFNBlock->w_down_bias,
             s->x_ffn_up,
             s->x_ffn_down,
             1,
@@ -272,8 +327,8 @@ int forward(
 
         // Skip connection
         vector_sum(s->x, s->x_ffn_down, cfg.d_model);
-    }
-    matmul(s->x, model->UnEmbedding, s->logits, 1, cfg.d_model, cfg.vocab_size);
+    } 
+    fused_matmul_bias(s->x, model->UnEmbedding, model->UnEmbeddingBias, s->logits, 1, cfg.d_model, cfg.vocab_size);
     int next_token = multinomial_sample(s->logits, cfg.vocab_size);
     
     return next_token;
