@@ -146,9 +146,9 @@ void layernorm(float* X, float* alpha, float* betta, float* out, int n) {
     for (int i = 0; i < n; i++) {
         sum += (X[i] - mean) * (X[i] - mean);
     }
-    float std = sqrtf(sum / n);
+    float std = sqrtf((sum / n) + 1e-5);
     for (int i = 0; i < n; i++) {
-        out[i] = alpha[i] * (X[i] - mean) / (std + 1e-8) + betta[i];
+        out[i] = alpha[i] * (X[i] - mean) / (std) + betta[i];
     }
 }
 
@@ -207,9 +207,8 @@ void single_head_attention(
     for (int i = 0; i < pos; i++) {
         attn_matrix[i] *= scale;
     }
-    for (int i = 0; i < pos; i++) {
-        softmax(attn_matrix, pos);
-    }
+   
+    softmax(attn_matrix, pos);
 
     // linearly combine V with attn_matrix into out
     for (int i = 0; i < dim_head; i++) {
@@ -237,7 +236,7 @@ void mlp(
     /*
         MLP layer applied to X.
     */
-    fused_matmul_bias(X, W_up, b_up, out_up, n, d_model, hidden_size);
+    fused_matmul_bias_transpose(X, W_up, b_up, out_up, n, d_model, hidden_size);
     gelu(out_up, hidden_size);
-    fused_matmul_bias(out_up, W_down, b_down, out_down, n, hidden_size, d_model);
+    fused_matmul_bias_transpose(out_up, W_down, b_down, out_down, n, hidden_size, d_model);
 }
