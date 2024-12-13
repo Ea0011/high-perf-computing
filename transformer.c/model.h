@@ -1,5 +1,4 @@
 #include "config.h"
-#include <cstdio>
 #include <stdlib.h>
 #include "ops.h"
 #include <sys/mman.h>
@@ -302,13 +301,6 @@ void mmap_model_from_checkpoint(Model* model, ModelConfig cfg, const char* path)
     // Unembedding
     model->UnEmbedding = weight_ptr;
     weight_ptr += cfg.d_model  * cfg.vocab_size;
-    
-
-    // final ptr location at file
-    if (weight_ptr - file_size != weight_ptr_copy) {
-        printf("Failed to load model\n");
-        exit(1);
-    }
 
     printf("Model loaded\n");
     fclose(file);
@@ -319,7 +311,7 @@ RunState* initialize_runstate(ModelConfig cfg) {
     RunState* s = (RunState*)calloc(1, sizeof(RunState));
 
     // Current token and position
-    s->token_idx = 0;
+    s->token_idx = 50256; // EOS token
     s->position = 0;
 
     // Intermediate states
@@ -371,7 +363,7 @@ int forward(
 
         // MHA
         for (int h = 0; h < cfg.num_heads; h++) {
-            fused_matmul_bias(
+            fused_matmul_bias_transpose(
                 s->x_norm,
                 model->Blocks[l].AttnBlock->wq + h * cfg.d_model * cfg.head_dim,
                 model->Blocks[l].AttnBlock->wq_bias + h * cfg.head_dim,
@@ -380,7 +372,7 @@ int forward(
                 cfg.d_model,
                 cfg.head_dim
             );
-            fused_matmul_bias(
+            fused_matmul_bias_transpose(
                 s->x_norm,
                 model->Blocks[l].AttnBlock->wk + h * cfg.d_model * cfg.head_dim,
                 model->Blocks[l].AttnBlock->wk_bias + h * cfg.head_dim,
@@ -389,7 +381,7 @@ int forward(
                 cfg.d_model,
                 cfg.head_dim
             );
-            fused_matmul_bias(
+            fused_matmul_bias_transpose(
                 s->x_norm,
                 model->Blocks[l].AttnBlock->wv + h * cfg.d_model * cfg.head_dim,
                 model->Blocks[l].AttnBlock->wv_bias + h * cfg.head_dim,
@@ -416,7 +408,7 @@ int forward(
         }
 
         // Output projection
-        matmul(s->attn_out, model->Blocks[l].AttnBlock->wo, s->x_norm, 1, cfg.d_model, cfg.d_model);
+        fused_matmul_bias_transpose(s->attn_out, model->Blocks[l].AttnBlock->wo, model->Blocks[l].AttnBlock->wo_bias, s->x_norm, 1, cfg.d_model, cfg.d_model);
 
         // Skip connection
         vector_sum(s->x, s->x_norm, cfg.d_model);
@@ -457,8 +449,9 @@ int forward(
     );
 
     // Unembedding and Sample
-    matmul(s->x_norm, model->UnEmbedding, s->logits, 1, cfg.d_model, cfg.vocab_size);
-    int next_token = multinomial_sample(s->logits, cfg.vocab_size);
+    matmul_transpose(s->x_norm, model->UnEmbedding, s->logits, 1, cfg.d_model, cfg.vocab_size);
+    softmax(s->logits, cfg.vocab_size);
+    int next_token = sample_argmax(s->logits, cfg.vocab_size);
     
     return next_token;
 }
