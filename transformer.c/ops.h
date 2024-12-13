@@ -36,9 +36,9 @@ void fused_matmul_bias_transpose(float* X, float* W, float* b, float* out, int n
     */
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < h; j++) {
-            float sum = 0;
+            float sum = b[j];
             for (int k = 0; k < d; k++) {
-                sum += X[i * d + k] * W[j * d + k] + b[j];
+                sum += X[i * d + k] * W[j * d + k];
             }
             out[i * h + j] = sum;
         }
@@ -69,9 +69,9 @@ void fused_matmul_bias(float* X, float* W, float* b, float* out, int n, int d, i
     */
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < h; j++) {
-            float sum = 0;
+            float sum = b[j];
             for (int k = 0; k < d; k++) {
-                sum += X[i * d + k] * W[k * h + j] + b[j];
+                sum += X[i * d + k] * W[k * h + j];
             }
             out[i * h + j] = sum;
         }
