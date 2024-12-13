@@ -1,6 +1,8 @@
 #include "config.h"
+#include <cstdio>
 #include <stdlib.h>
 #include "ops.h"
+#include <sys/mman.h>
 
 typedef struct {
     float* attn_norm_alpha;
@@ -34,7 +36,8 @@ typedef struct {
     float* PositionalEncoding;
     TransformerBlock* Blocks;
     float* UnEmbedding;
-    float* UnEmbeddingBias;
+    float* UnEmbeddingLNAlpha;
+    float* UnEmbeddingLNBetta;
 } Model;
 
 typedef struct {
@@ -59,7 +62,8 @@ void zero_init_model_from_config(Model* model, ModelConfig cfg) {
     model->Embedding = (float*)calloc(cfg.vocab_size * cfg.d_model, sizeof(float));
     model->PositionalEncoding = (float*)calloc(cfg.max_context_len * cfg.d_model, sizeof(float));
     model->UnEmbedding = (float*)calloc(cfg.d_model * cfg.vocab_size, sizeof(float));
-    model->UnEmbeddingBias = (float*)calloc(cfg.vocab_size, sizeof(float));
+    model->UnEmbeddingLNAlpha = (float*)calloc(cfg.d_model, sizeof(float));
+    model->UnEmbeddingLNBetta = (float*)calloc(cfg.d_model, sizeof(float));
     model->Blocks = (TransformerBlock*)calloc(cfg.num_layers, sizeof(TransformerBlock));
 
     for (int i = 0; i < cfg.num_layers; i++) {
@@ -103,7 +107,8 @@ void radom_init_model_from_config(Model* model, ModelConfig cfg, float scale) {
     }
 
     model->UnEmbedding = (float*)calloc(cfg.d_model * cfg.vocab_size, sizeof(float));
-    model->UnEmbeddingBias = (float*)calloc(cfg.vocab_size, sizeof(float));
+    model->UnEmbeddingLNAlpha = (float*)calloc(cfg.d_model, sizeof(float));
+    model->UnEmbeddingLNBetta = (float*)calloc(cfg.d_model, sizeof(float));
     for (int i = 0; i < cfg.d_model * cfg.vocab_size; i++) {
         model->UnEmbedding[i] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * scale;
     }
@@ -196,6 +201,119 @@ void radom_init_model_from_config(Model* model, ModelConfig cfg, float scale) {
         }
     }
 }
+
+void mmap_model_from_checkpoint(Model* model, ModelConfig cfg, const char* path) {
+    FILE* file = fopen(path, "rb");
+    if (file == NULL) {
+        printf("Failed to open file\n");
+        exit(1);
+    }
+
+    fseek(file, 0L, SEEK_END);
+    long file_size = ftell(file);
+
+    zero_init_model_from_config(model, cfg);
+
+    float* weight_ptr = (float*)mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fileno(file), 0);
+    float* weight_ptr_copy = weight_ptr;
+
+    if (weight_ptr == MAP_FAILED) {
+        printf("Failed to map file\n");
+        exit(1);
+    }
+
+    // start setting model weight pointers to their mapped weights
+
+    // Embedding matrices
+    model->Embedding = weight_ptr;
+    weight_ptr += cfg.vocab_size * cfg.d_model;
+    model->PositionalEncoding = weight_ptr;
+    weight_ptr += cfg.max_context_len * cfg.d_model;
+
+    // Transformer blocks
+
+    /*
+        GPT2 weights are stored in the following order:
+        - Attention LayerNorm alpha
+        - Attention LayerNorm betta
+        - Attention wq
+        - Attention wk
+        - Attention wv
+        - Attention wk bias
+        - Attention wq bias
+        - Attention wv bias
+        - Attention wo
+        - Attention wo bias
+        - FFN LayerNorm alpha
+        - FFN LayerNorm betta
+        - FFN w_up
+        - FFN w_up bias
+        - FFN w_down
+        - FFN w_down bias
+    */
+    for (int i = 0; i < cfg.num_layers; i++) {
+        // Attn LayerNorm
+        model->Blocks[i].AttnBlock->attn_norm_alpha = weight_ptr;
+        weight_ptr += cfg.d_model;
+        model->Blocks[i].AttnBlock->attn_norm_betta = weight_ptr;
+        weight_ptr += cfg.d_model;
+
+        // Attention Block
+        model->Blocks[i].AttnBlock->wq = weight_ptr;
+        weight_ptr += cfg.num_heads * cfg.d_model * cfg.head_dim;
+        model->Blocks[i].AttnBlock->wk = weight_ptr;
+        weight_ptr += cfg.num_heads * cfg.d_model * cfg.head_dim;
+        model->Blocks[i].AttnBlock->wv = weight_ptr;
+        weight_ptr += cfg.num_heads * cfg.d_model * cfg.head_dim;
+        model->Blocks[i].AttnBlock->wq_bias = weight_ptr;
+        weight_ptr += cfg.num_heads * cfg.head_dim;
+        model->Blocks[i].AttnBlock->wk_bias = weight_ptr;
+        weight_ptr += cfg.num_heads * cfg.head_dim;
+        model->Blocks[i].AttnBlock->wv_bias = weight_ptr;
+        weight_ptr += cfg.num_heads * cfg.head_dim;
+        model->Blocks[i].AttnBlock->wo = weight_ptr;
+        weight_ptr += cfg.d_model * cfg.d_model;
+        model->Blocks[i].AttnBlock->wo_bias = weight_ptr;
+        weight_ptr += cfg.d_model;
+
+        // FFN Layer Norm
+        model->Blocks[i].FFNBlock->ffn_norm_alpha = weight_ptr;
+        weight_ptr += cfg.d_model;
+        model->Blocks[i].FFNBlock->ffn_norm_betta = weight_ptr;
+        weight_ptr += cfg.d_model;
+
+        // FFN Block
+        model->Blocks[i].FFNBlock->w_up = weight_ptr;
+        weight_ptr += cfg.d_model * cfg.hidden_size;
+        model->Blocks[i].FFNBlock->w_up_bias = weight_ptr;
+        weight_ptr += cfg.hidden_size;
+        model->Blocks[i].FFNBlock->w_down = weight_ptr;
+        weight_ptr += cfg.hidden_size * cfg.d_model;
+        model->Blocks[i].FFNBlock->w_down_bias = weight_ptr;
+        weight_ptr += cfg.d_model;
+    }
+
+    // UnEmbedding Layer Norm
+    model->UnEmbeddingLNAlpha = weight_ptr;
+    weight_ptr += cfg.d_model;
+    model->UnEmbeddingLNBetta = weight_ptr;
+    weight_ptr += cfg.d_model;
+
+    // Unembedding
+    model->UnEmbedding = weight_ptr;
+    weight_ptr += cfg.d_model  * cfg.vocab_size;
+    
+
+    // final ptr location at file
+    if (weight_ptr - file_size != weight_ptr_copy) {
+        printf("Failed to load model\n");
+        exit(1);
+    }
+
+    printf("Model loaded\n");
+    fclose(file);
+}
+
 
 RunState* initialize_runstate(ModelConfig cfg) {
     RunState* s = (RunState*)calloc(1, sizeof(RunState));
@@ -327,8 +445,19 @@ int forward(
 
         // Skip connection
         vector_sum(s->x, s->x_ffn_down, cfg.d_model);
-    } 
-    fused_matmul_bias(s->x, model->UnEmbedding, model->UnEmbeddingBias, s->logits, 1, cfg.d_model, cfg.vocab_size);
+    }
+
+    // Final layer norm
+    layernorm(
+        s->x,
+        model->UnEmbeddingLNAlpha,
+        model->UnEmbeddingLNBetta,
+        s->x_norm,
+        cfg.d_model
+    );
+
+    // Unembedding and Sample
+    matmul(s->x_norm, model->UnEmbedding, s->logits, 1, cfg.d_model, cfg.vocab_size);
     int next_token = multinomial_sample(s->logits, cfg.vocab_size);
     
     return next_token;
