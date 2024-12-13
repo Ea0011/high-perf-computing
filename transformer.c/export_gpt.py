@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 
 def summarize_weights(weights: dict):
@@ -47,7 +48,7 @@ def export_gpt(
                     model[key] = model[key].view(3, d_model // 3)
 
             print(f"Writing {key} with shape {model[key].shape} at position {f.tell()}: Size in float32: {model[key].numpy().size * 4}")
-            f.write(model[key].numpy().tobytes())
+            f.write(model[key].numpy().astype(np.float32).tobytes())
             num_exported_params += model[key].numpy().size
 
         print("Total size in bytes:", f.tell())
