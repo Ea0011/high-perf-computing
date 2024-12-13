@@ -24,7 +24,7 @@ void generate(ModelConfig cfg, Model* model) {
         s->position++;
 
         // print current token id and position
-        // printf("Position %d: %d\n", s->position, s->token_idx);
+        printf("Position %d: %d\n", s->position, s->token_idx);
         if (s->token_idx == -1) { // EOS Token ideally
             break;
         }
@@ -42,7 +42,8 @@ int main() {
     ModelConfig cfg = read_config_from_file("gpt2_small.bin");
     Model* model = (Model*)malloc(sizeof(Model));
 
-    radom_init_model_from_config(model, cfg, 0.02);
+    // radom_init_model_from_config(model, cfg, 0.02);
+    mmap_model_from_checkpoint(model, cfg, "./models/c_model.bin");
     generate(cfg, model);
     return 0;
 }
