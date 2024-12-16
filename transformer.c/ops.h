@@ -113,10 +113,16 @@ void relu(float* X, int n) {
     }
 }
 
-void softmax(float* X, int n) {
+void softmax(float* X, int n, float temperature) {
     /*
         Softmax function applied to X.
     */
+    if (temperature != 1.0) {
+        for (int i = 0; i < n; i++) {
+            X[i] /= temperature;
+        }
+    }
+
     float max = X[0];
     for (int i = 1; i < n; i++) {
         if (X[i] > max) {
@@ -166,7 +172,7 @@ int multinomial_sample(float* X, int n) {
         }
     }
 
-    return n - 1;
+    return -1;
 }
 
 int sample_argmax(float* X, int n) {
@@ -208,7 +214,7 @@ void single_head_attention(
         attn_matrix[i] *= scale;
     }
    
-    softmax(attn_matrix, pos);
+    softmax(attn_matrix, pos, 1.0);
 
     // linearly combine V with attn_matrix into out
     for (int i = 0; i < dim_head; i++) {

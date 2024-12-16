@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
+#include "tokenizer.h"
 
 long time_in_ms() {
     struct timespec time;
@@ -12,6 +13,7 @@ long time_in_ms() {
 
 void generate(ModelConfig cfg, Model* model) {
     RunState* s = initialize_runstate(cfg);
+    char** vocab = read_vocab("vocab.bin", cfg.vocab_size);
 
     double tokens_per_second = 0;
     double total_tokens = 0;
@@ -24,10 +26,10 @@ void generate(ModelConfig cfg, Model* model) {
         s->position++;
 
         // print current token id and position
-        printf("Position %d: %d\n", s->position, s->token_idx);
         if (s->token_idx == -1) { // EOS Token ideally
             break;
         }
+        printf("Position %d: %s\n", s->position, decode(vocab, s->token_idx));
     }
     long time_end = time_in_ms();
     total_time = time_end - time_start;

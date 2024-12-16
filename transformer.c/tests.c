@@ -48,7 +48,7 @@ int test_attn() {
 int test_softmax() {
     // Test case for softmax
     float X[4] = {1, 2, 3, 4};
-    softmax(X, 4);
+    softmax(X, 4, 1.0);
 
     float expected[4] = {0.0321, 0.0871, 0.2369, 0.6439};
 
