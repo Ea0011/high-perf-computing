@@ -30,7 +30,7 @@
             "${workspaceFolder}/transformer.c/run.c",
             "-mavx2",
             "-mfma",
-            "-Ofast",
+            "-O3",
             "-lm"          // Links the math library
         ],
         "problemMatcher": ["$gcc"],
