@@ -22,14 +22,16 @@ void generate(ModelConfig cfg, Model* model) {
     long time_start = time_in_ms();
     for (;s->position < cfg.max_context_len;) {
         int next_token = forward(model, s, cfg);
-        s->token_idx = next_token;
-        s->position++;
-
-        // print current token id and position
-        if (s->token_idx == -1) { // EOS Token ideally
+        if (next_token == 50256) {
             break;
         }
-        printf("Position %d: %s\n", s->position, decode(vocab, s->token_idx));
+
+        char* decoded_token = decode(vocab, s->token_idx, next_token);
+        printf("%s", decoded_token);
+        fflush(stdout); // Ensure the output is flushed immediately
+
+        s->token_idx = next_token;
+        s->position++;
     }
     long time_end = time_in_ms();
     total_time = time_end - time_start;
@@ -44,7 +46,6 @@ int main() {
     ModelConfig cfg = read_config_from_file("gpt2_small.bin");
     Model* model = (Model*)malloc(sizeof(Model));
 
-    // radom_init_model_from_config(model, cfg, 0.02);
     mmap_model_from_checkpoint(model, cfg, "./models/c_model.bin");
     generate(cfg, model);
     return 0;

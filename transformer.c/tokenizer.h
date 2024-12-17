@@ -85,6 +85,42 @@ char** read_vocab(char* path, int vocab_size) {
 }
 
 
-char* decode(char** vocab, int token_idx) {
-    return vocab[token_idx];
+int is_sentence_delimiter(char c) {
+    return c == '.' || c == '!' || c == '?';
+}
+
+char* decode(char** vocab, int prev_token_idx, int token_idx) {
+    char* token = vocab[token_idx];
+    char* prev_token = vocab[prev_token_idx];
+    int needs_space = 0;
+
+    // Check if we need to prefix with a space
+    if (prev_token != NULL) {
+        size_t prev_len = strlen(prev_token);
+        if (prev_len > 0 && is_sentence_delimiter(prev_token[prev_len - 1])) {
+            needs_space = 1;
+        }
+    }
+
+    // Check if the token starts with a special character (e.g., -60 in the original example)
+    if (token[0] == -60) {
+        needs_space = 1;
+        token += 2; // Skip the special character
+    }
+
+    // Add space if needed
+    if (needs_space) {
+        size_t new_length = strlen(token) + 2; // +1 for space, +1 for '\0'
+        char* new_token = malloc(new_length);
+        if (new_token == NULL) {
+            fprintf(stderr, "Memory allocation failed\n");
+            exit(1);
+        }
+
+        new_token[0] = ' ';       // Add space at the beginning
+        strcpy(new_token + 1, token); // Copy the rest of the token
+        return new_token;         // Caller must free this token
+    }
+
+    return token; // Return the unmodified token
 }

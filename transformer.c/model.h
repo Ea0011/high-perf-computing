@@ -450,7 +450,7 @@ int forward(
 
     // Unembedding and Sample
     matmul_transpose(s->x_norm, model->UnEmbedding, s->logits, 1, cfg.d_model, cfg.vocab_size);
-    softmax(s->logits, cfg.vocab_size, 0.7);
+    softmax(s->logits, cfg.vocab_size, 1.2);
     int next_token = multinomial_sample(s->logits, cfg.vocab_size);
     
     return next_token;
