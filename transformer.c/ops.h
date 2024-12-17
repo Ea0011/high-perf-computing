@@ -8,6 +8,7 @@
 #include <math.h>
 #include <string.h>
 #include <fcntl.h>
+#include <time.h>
 #include "utils.h"
 
 
@@ -163,7 +164,8 @@ int multinomial_sample(float* X, int n) {
         Sample from the multinomial distribution defined by X.
         X is a probability distribution over n categories.
     */
-    float r = (float)rand() / RAND_MAX;
+    srand(time(NULL)); // Seed with the current time
+    float r = (float)random() / RAND_MAX;
 
     for (int i = 0; i < n; i++) {
         r -= X[i];
