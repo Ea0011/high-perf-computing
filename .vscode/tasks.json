@@ -40,6 +40,25 @@
         }
       },
       {
+        "label": "Build transformer omp fast",
+        "type": "shell",
+        "command": "gcc",
+        "args": [
+            "-o", "${workspaceFolder}/transformer.c/build/run_fast.o",
+            "${workspaceFolder}/transformer.c/run.c",
+            "-mavx2",
+            "-mfma",
+            "-O3",
+            "-lm",          // Links the math library
+            "-fopenmp"
+        ],
+        "problemMatcher": ["$gcc"],
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        }
+      },
+      {
         "label": "Build with AVX2 and FMA (Debug)",
         "type": "shell",
         "command": "clang",

@@ -1,6 +1,7 @@
 #include "config.h"
 #include <stdlib.h>
 #include "ops.h"
+#include <omp.h>
 #include <sys/mman.h>
 
 typedef struct {
@@ -328,7 +329,7 @@ RunState* initialize_runstate(ModelConfig cfg) {
     s->q = (float*)calloc(cfg.head_dim * cfg.num_heads, sizeof(float));
     s->k = (float*)calloc(cfg.head_dim * cfg.num_heads, sizeof(float));
     s->v = (float*)calloc(cfg.head_dim * cfg.num_heads, sizeof(float));
-    s->attn_weights = (float*)calloc(cfg.max_context_len, sizeof(float));
+    s->attn_weights = (float*)calloc(cfg.max_context_len * cfg.num_heads, sizeof(float));
     s->attn_out = (float*)calloc(cfg.d_model, sizeof(float));
 
     // Output
@@ -361,6 +362,7 @@ int forward(
         );
 
         // MHA
+        #pragma omp parallel for num_threads(4)
         for (int h = 0; h < cfg.num_heads; h++) {
             fused_matmul_bias_transpose(
                 s->x_norm,
@@ -398,7 +400,7 @@ int forward(
                 s->q + h * cfg.head_dim,
                 s->k_cache + l * cfg.num_heads * cfg.max_context_len * cfg.head_dim + h * cfg.max_context_len * cfg.head_dim,
                 s->v_cache + l * cfg.num_heads * cfg.max_context_len * cfg.head_dim + h * cfg.max_context_len * cfg.head_dim,
-                s->attn_weights,
+                s->attn_weights + h * cfg.max_context_len,
                 s->attn_out + h * cfg.head_dim,
                 s->position + 1,
                 cfg.head_dim,
