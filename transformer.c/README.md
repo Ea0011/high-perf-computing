@@ -5,6 +5,10 @@ The performance is measure on an Intel Core i7-1165G7 - 2.80GHz CPU with 8 Threa
 
 The CPU supports AVX512 SIMD  
 
+For reference, average tok/s using HuggingFace is 30.64  
+
+## GPT2 Small - 137M Parameters
+
 | Experiment Name | Token/s |
 |-----------------|---------|
 | Single Threaded    |   5.47      |
@@ -13,3 +17,12 @@ The CPU supports AVX512 SIMD
 | Multi Threaded: Parallel MHA, Parallel Matmul    |   17.77      |
 | Multi Threaded: Parallel MHA, Parallel Matmul, SIMD    |   36.6      |
 | Multi Threaded: Parallel MHA, Parallel Matmul, SIMD, Hinting at Largest SIMD Registers    |   43.17      |
+
+
+## GPT2-xl - 1.61B Paramters
+
+For reference, HuggingFace GPT2-xl performs at 3.12 tok/s  
+
+| Experiment Name | Token/s |
+|-----------------|---------|
+| Multi Threaded: Parallel MHA, Parallel Matmul, SIMD, Hinting at Largest SIMD Registers    |   3.88      |

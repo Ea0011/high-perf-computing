@@ -312,7 +312,7 @@ RunState* initialize_runstate(ModelConfig cfg) {
     RunState* s = (RunState*)calloc(1, sizeof(RunState));
 
     // Current token and position
-    s->token_idx = 50256; // EOS token
+    s->token_idx = 3000; // EOS token
     s->position = 0;
 
     // Intermediate states
@@ -451,7 +451,7 @@ int forward(
 
     // Unembedding and Sample
     matmul_transpose(s->x_norm, model->UnEmbedding, s->logits, 1, cfg.d_model, cfg.vocab_size);
-    softmax(s->logits, cfg.vocab_size, 0.7);
+    softmax(s->logits, cfg.vocab_size, 0.1);
     int next_token = multinomial_sample(s->logits, cfg.vocab_size);
     
     return next_token;
