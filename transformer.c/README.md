@@ -9,3 +9,4 @@ The performance is measure on an Intel Core i7-1165G7 - 2.80GHz CPU with 8 Threa
 | Single Threaded: Inline Functions    |   5.52      |
 | Multi Threaded: Parallel MHA    |   6.09      |
 | Multi Threaded: Parallel MHA, Parallel Matmul    |   17.77      |
+| Multi Threaded: Parallel MHA, Parallel Matmul, SIMD    |   36.6      |
