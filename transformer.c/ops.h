@@ -25,6 +25,7 @@ inline void vector_sum(float* X1, float* X2, int d) {
     /*
         Sum of two vectors X1 and X2, storing the result in X1.
     */
+    #pragma omp simd simdlen(16)
     for (int i = 0; i < d; i++) {
         X1[i] += X2[i];
     }
@@ -39,7 +40,7 @@ inline void fused_matmul_bias_transpose(float* X, float* W, float* b, float* out
         #pragma omp parallel for num_threads(4)
         for (int j = 0; j < h; j++) {
             float sum = b[j];
-            #pragma omp simd reduction(+:sum)
+            #pragma omp simd reduction(+:sum) simdlen(16)
             for (int k = 0; k < d; k++) {
                 sum += X[i * d + k] * W[j * d + k];
             }
@@ -57,7 +58,7 @@ inline void fused_matmul_gelu_bias_transpose(float* X, float* W, float* b, float
         #pragma omp parallel for num_threads(4)
         for (int j = 0; j < h; j++) {
             float sum = b[j];
-            #pragma omp simd reduction(+:sum)
+            #pragma omp simd reduction(+:sum) simdlen(16)
             for (int k = 0; k < d; k++) {
                 sum += X[i * d + k] * W[j * d + k];
             }
@@ -75,7 +76,7 @@ inline void matmul_transpose(float* X, float* W, float* out, int n, int d, int h
         #pragma omp parallel for num_threads(4)
         for (int j = 0; j < h; j++) {
             float sum = 0;
-            #pragma omp simd reduction(+:sum)
+            #pragma omp simd reduction(+:sum) simdlen(16)
             for (int k = 0; k < d; k++) {
                 sum += X[i * d + k] * W[j * d + k];
             }
@@ -94,7 +95,7 @@ inline void fused_matmul_bias(float* X, float* W, float* b, float* out, int n, i
         #pragma omp parallel for num_threads(4)
         for (int j = 0; j < h; j++) {
             float sum = b[j];
-            #pragma omp simd reduction(+:sum)
+            #pragma omp simd reduction(+:sum) simdlen(16)
             for (int k = 0; k < d; k++) {
                 sum += X[i * d + k] * W[k * h + j];
             }
@@ -112,7 +113,7 @@ inline void matmul(float* X, float* W, float* out, int n, int d, int h) {
         #pragma omp parallel for num_threads(4)
         for (int j = 0; j < h; j++) {
             float sum = 0;
-            #pragma omp simd reduction(+:sum)
+            #pragma omp simd reduction(+:sum) simdlen(16)
             for (int k = 0; k < d; k++) {
                 sum += X[i * d + k] * W[k * h + j];
             }
