@@ -325,10 +325,9 @@ RunState* initialize_runstate(ModelConfig cfg) {
     s->v_cache = (float*)calloc(cfg.num_layers * cfg.num_heads * cfg.max_context_len * cfg.head_dim, sizeof(float));
 
     // Attention matrices
-    s->q = (float*)calloc(cfg.head_dim, sizeof(float));
-    // These three are a bit special, they hold all Keys, Values, and attention outputs for all heads
-    s->k = (float*)calloc(cfg.head_dim, sizeof(float));
-    s->v = (float*)calloc(cfg.head_dim, sizeof(float));
+    s->q = (float*)calloc(cfg.head_dim * cfg.num_heads, sizeof(float));
+    s->k = (float*)calloc(cfg.head_dim * cfg.num_heads, sizeof(float));
+    s->v = (float*)calloc(cfg.head_dim * cfg.num_heads, sizeof(float));
     s->attn_weights = (float*)calloc(cfg.max_context_len, sizeof(float));
     s->attn_out = (float*)calloc(cfg.d_model, sizeof(float));
 
@@ -367,7 +366,7 @@ int forward(
                 s->x_norm,
                 model->Blocks[l].AttnBlock->wq + h * cfg.d_model * cfg.head_dim,
                 model->Blocks[l].AttnBlock->wq_bias + h * cfg.head_dim,
-                s->q,
+                s->q + h * cfg.head_dim,
                 1,
                 cfg.d_model,
                 cfg.head_dim
@@ -376,7 +375,7 @@ int forward(
                 s->x_norm,
                 model->Blocks[l].AttnBlock->wk + h * cfg.d_model * cfg.head_dim,
                 model->Blocks[l].AttnBlock->wk_bias + h * cfg.head_dim,
-                s->k,
+                s->k + h * cfg.head_dim,
                 1,
                 cfg.d_model,
                 cfg.head_dim
@@ -385,18 +384,18 @@ int forward(
                 s->x_norm,
                 model->Blocks[l].AttnBlock->wv + h * cfg.d_model * cfg.head_dim,
                 model->Blocks[l].AttnBlock->wv_bias + h * cfg.head_dim,
-                s->v,
+                s->v + h * cfg.head_dim,
                 1,
                 cfg.d_model,
                 cfg.head_dim
             );
 
             // Put the values and keys into the cache (layer, head, position, dim_head)
-            memcpy(s->k_cache + l * cfg.num_heads * cfg.max_context_len * cfg.head_dim + h * cfg.max_context_len * cfg.head_dim + s->position * cfg.head_dim, s->k, cfg.head_dim * sizeof(float));
-            memcpy(s->v_cache + l * cfg.num_heads * cfg.max_context_len * cfg.head_dim + h * cfg.max_context_len * cfg.head_dim + s->position * cfg.head_dim, s->v, cfg.head_dim * sizeof(float));
+            memcpy(s->k_cache + l * cfg.num_heads * cfg.max_context_len * cfg.head_dim + h * cfg.max_context_len * cfg.head_dim + s->position * cfg.head_dim, s->k + h * cfg.head_dim, cfg.head_dim * sizeof(float));
+            memcpy(s->v_cache + l * cfg.num_heads * cfg.max_context_len * cfg.head_dim + h * cfg.max_context_len * cfg.head_dim + s->position * cfg.head_dim, s->v + h * cfg.head_dim, cfg.head_dim * sizeof(float));
             
             single_head_attention(
-                s->q,
+                s->q + h * cfg.head_dim,
                 s->k_cache + l * cfg.num_heads * cfg.max_context_len * cfg.head_dim + h * cfg.max_context_len * cfg.head_dim,
                 s->v_cache + l * cfg.num_heads * cfg.max_context_len * cfg.head_dim + h * cfg.max_context_len * cfg.head_dim,
                 s->attn_weights,
