@@ -4,6 +4,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include "tokenizer.h"
+#include <stdlib.h>
 
 long time_in_ms() {
     struct timespec time;

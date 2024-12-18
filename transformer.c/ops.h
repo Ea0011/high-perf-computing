@@ -36,6 +36,7 @@ inline void fused_matmul_bias_transpose(float* X, float* W, float* b, float* out
         X has shape (n, d), W has shape (h, d), and out has shape (n, h).
     */
     for (int i = 0; i < n; i++) {
+        #pragma omp parallel for num_threads(4)
         for (int j = 0; j < h; j++) {
             float sum = b[j];
             for (int k = 0; k < d; k++) {
@@ -52,6 +53,7 @@ inline void fused_matmul_gelu_bias_transpose(float* X, float* W, float* b, float
         X has shape (n, d), W has shape (h, d), and out has shape (n, h).
     */
     for (int i = 0; i < n; i++) {
+        #pragma omp parallel for num_threads(4)
         for (int j = 0; j < h; j++) {
             float sum = b[j];
             for (int k = 0; k < d; k++) {
@@ -68,6 +70,7 @@ inline void matmul_transpose(float* X, float* W, float* out, int n, int d, int h
         X has shape (n, d), W has shape (h, d), and out has shape (n, h).
     */
     for (int i = 0; i < n; i++) {
+        #pragma omp parallel for num_threads(4)
         for (int j = 0; j < h; j++) {
             float sum = 0;
             for (int k = 0; k < d; k++) {
@@ -85,6 +88,7 @@ inline void fused_matmul_bias(float* X, float* W, float* b, float* out, int n, i
         X has shape (n, d), W has shape (d, h), and out has shape (n, h).
     */
     for (int i = 0; i < n; i++) {
+        #pragma omp parallel for num_threads(4)
         for (int j = 0; j < h; j++) {
             float sum = b[j];
             for (int k = 0; k < d; k++) {
@@ -101,6 +105,7 @@ inline void matmul(float* X, float* W, float* out, int n, int d, int h) {
         X has shape (n, d), W has shape (d, h), and out has shape (n, h).
     */
     for (int i = 0; i < n; i++) {
+        #pragma omp parallel for num_threads(4)
         for (int j = 0; j < h; j++) {
             float sum = 0;
             for (int k = 0; k < d; k++) {
