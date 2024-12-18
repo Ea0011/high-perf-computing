@@ -12,7 +12,7 @@
 #include "utils.h"
 
 
-void embedding_lookup(float* E, int index, float* out, int d) {
+inline void embedding_lookup(float* E, int index, float* out, int d) {
     /*
         Lookup the embedding for the given index.
         E is a matrix of shape (n, d), where n is the number of embeddings.
@@ -21,7 +21,7 @@ void embedding_lookup(float* E, int index, float* out, int d) {
     memcpy(out, E + index * d, d * sizeof(float));
 }
 
-void vector_sum(float* X1, float* X2, int d) {
+inline void vector_sum(float* X1, float* X2, int d) {
     /*
         Sum of two vectors X1 and X2, storing the result in X1.
     */
@@ -30,7 +30,7 @@ void vector_sum(float* X1, float* X2, int d) {
     }
 }
 
-void fused_matmul_bias_transpose(float* X, float* W, float* b, float* out, int n, int d, int h) {
+inline void fused_matmul_bias_transpose(float* X, float* W, float* b, float* out, int n, int d, int h) {
     /*
         Matrix multiplication of X and W^T, storing the result in out.
         X has shape (n, d), W has shape (h, d), and out has shape (n, h).
@@ -46,7 +46,23 @@ void fused_matmul_bias_transpose(float* X, float* W, float* b, float* out, int n
     }
 }
 
-void matmul_transpose(float* X, float* W, float* out, int n, int d, int h) {
+inline void fused_matmul_gelu_bias_transpose(float* X, float* W, float* b, float* out, int n, int d, int h) {
+    /*
+        Matrix multiplication of X and W^T, storing the result in out.
+        X has shape (n, d), W has shape (h, d), and out has shape (n, h).
+    */
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < h; j++) {
+            float sum = b[j];
+            for (int k = 0; k < d; k++) {
+                sum += X[i * d + k] * W[j * d + k];
+            }
+            out[i * h + j] = 0.5 * sum * (1 + tanhf(0.79788456 * (sum + 0.044715 * sum * sum * sum)));
+        }
+    }
+}
+
+inline void matmul_transpose(float* X, float* W, float* out, int n, int d, int h) {
     /*
         Matrix multiplication of X and W^T, storing the result in out.
         X has shape (n, d), W has shape (h, d), and out has shape (n, h).
@@ -62,7 +78,7 @@ void matmul_transpose(float* X, float* W, float* out, int n, int d, int h) {
     }
 }
 
-void fused_matmul_bias(float* X, float* W, float* b, float* out, int n, int d, int h) {
+inline void fused_matmul_bias(float* X, float* W, float* b, float* out, int n, int d, int h) {
     /*
         Matrix multiplication of X and W, storing the result in out.
         Fuses bias addition in one function
@@ -79,7 +95,7 @@ void fused_matmul_bias(float* X, float* W, float* b, float* out, int n, int d, i
     }
 }
 
-void matmul(float* X, float* W, float* out, int n, int d, int h) {
+inline void matmul(float* X, float* W, float* out, int n, int d, int h) {
     /*
         Matrix multiplication of X and W, storing the result in out.
         X has shape (n, d), W has shape (d, h), and out has shape (n, h).
@@ -95,7 +111,7 @@ void matmul(float* X, float* W, float* out, int n, int d, int h) {
     }
 }
 
-void gelu(float* X, int n) {
+inline void gelu(float* X, int n) {
     /*
         GELU activation function applied to X.
         GELU is approximated via xσ(1.702x)
@@ -114,7 +130,7 @@ void relu(float* X, int n) {
     }
 }
 
-void softmax(float* X, int n, float temperature) {
+inline void softmax(float* X, int n, float temperature) {
     /*
         Softmax function applied to X.
     */
@@ -140,7 +156,7 @@ void softmax(float* X, int n, float temperature) {
     }
 }
 
-void layernorm(float* X, float* alpha, float* betta, float* out, int n) {
+inline void layernorm(float* X, float* alpha, float* betta, float* out, int n) {
     /*
         Layer normalization applied to X.
     */
@@ -159,7 +175,7 @@ void layernorm(float* X, float* alpha, float* betta, float* out, int n) {
     }
 }
 
-int multinomial_sample(float* X, int n) {
+inline int multinomial_sample(float* X, int n) {
     /*
         Sample from the multinomial distribution defined by X.
         X is a probability distribution over n categories.
@@ -194,7 +210,7 @@ int sample_argmax(float* X, int n) {
 
 
 // -------- Transformer Operations --------
-void single_head_attention(
+inline void single_head_attention(
     float* Q, // Matrix of shape (1, dim_head)
     float* K, // Matrix of shape (n, dim_head)
     float* V, // Matrix of shape (n, dim_head)
@@ -229,7 +245,7 @@ void single_head_attention(
 }
 
 
-void mlp(
+inline void mlp(
     float* X,
     float* W_up,
     float* b_up,
