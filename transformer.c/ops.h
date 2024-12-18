@@ -127,6 +127,7 @@ inline void gelu(float* X, int n) {
         GELU activation function applied to X.
         GELU is approximated via xσ(1.702x)
     */
+    #pragma omp simd simdlen(16)
     for (int i = 0; i < n; i++) {
         X[i] = 0.5 * X[i] * (1 + tanhf(0.79788456 * (X[i] + 0.044715 * X[i] * X[i] * X[i])));
     }
@@ -146,22 +147,26 @@ inline void softmax(float* X, int n, float temperature) {
         Softmax function applied to X.
     */
     if (temperature != 1.0) {
+        #pragma omp simd simdlen(16)
         for (int i = 0; i < n; i++) {
             X[i] /= temperature;
         }
     }
 
     float max = X[0];
+    #pragma omp simd simdlen(16) reduction(max:max)
     for (int i = 1; i < n; i++) {
         if (X[i] > max) {
             max = X[i];
         }
     }
     float sum = 0;
+    #pragma omp simd simdlen(16) reduction(+:sum)
     for (int i = 0; i < n; i++) {
         X[i] = expf(X[i] - max);
         sum += X[i];
     }
+    #pragma omp simd simdlen(16)
     for (int i = 0; i < n; i++) {
         X[i] /= sum;
     }
@@ -172,15 +177,20 @@ inline void layernorm(float* X, float* alpha, float* betta, float* out, int n) {
         Layer normalization applied to X.
     */
     float sum = 0;
+    #pragma omp simd simdlen(16) reduction(+:sum)
     for (int i = 0; i < n; i++) {
         sum += X[i];
     }
     float mean = sum / n;
     sum = 0;
+
+    #pragma omp simd simdlen(16) reduction(+:sum)
     for (int i = 0; i < n; i++) {
         sum += (X[i] - mean) * (X[i] - mean);
     }
     float std = sqrtf((sum / n) + 1e-5);
+
+    #pragma omp simd simdlen(16)
     for (int i = 0; i < n; i++) {
         out[i] = alpha[i] * (X[i] - mean) / (std) + betta[i];
     }
@@ -239,6 +249,8 @@ inline void single_head_attention(
     // array[layer][head][pos][dimension]
 
     float scale = 1.0f / sqrtf(dim_head);
+
+    #pragma omp simd simdlen(16)
     for (int i = 0; i < pos; i++) {
         attn_matrix[i] *= scale;
     }
@@ -248,7 +260,7 @@ inline void single_head_attention(
     // linearly combine V with attn_matrix into out
     for (int i = 0; i < dim_head; i++) {
         float sum = 0;
-        #pragma omp simd reduction(+:sum)
+        #pragma omp simd reduction(+:sum) simdlen(16)
         for (int j = 0; j < pos; j++) {
             sum += attn_matrix[j] * V[j * dim_head + i];
         }
