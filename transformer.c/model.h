@@ -225,7 +225,9 @@ void mmap_model_from_checkpoint(Model* model, ModelConfig cfg, const char* path)
     // start setting model weight pointers to their mapped weights
 
     // Embedding matrices
+    // Note that GPT2 ties embedding and unembedding weights
     model->Embedding = weight_ptr;
+    model->UnEmbedding = weight_ptr;
     weight_ptr += cfg.vocab_size * cfg.d_model;
     model->PositionalEncoding = weight_ptr;
     weight_ptr += cfg.max_context_len * cfg.d_model;
@@ -299,10 +301,6 @@ void mmap_model_from_checkpoint(Model* model, ModelConfig cfg, const char* path)
     model->UnEmbeddingLNBetta = weight_ptr;
     weight_ptr += cfg.d_model;
 
-    // Unembedding
-    model->UnEmbedding = weight_ptr;
-    weight_ptr += cfg.d_model  * cfg.vocab_size;
-
     printf("Model loaded\n");
     fclose(file);
 }
@@ -312,7 +310,7 @@ RunState* initialize_runstate(ModelConfig cfg) {
     RunState* s = (RunState*)calloc(1, sizeof(RunState));
 
     // Current token and position
-    s->token_idx = 3000; // EOS token
+    s->token_idx = 50256; // EOS token
     s->position = 0;
 
     // Intermediate states
@@ -438,6 +436,11 @@ int forward(
 
         // Skip connection
         vector_sum(s->x, s->x_ffn_down, cfg.d_model);
+
+        // nop
+        while (1) {
+            break;
+        }
     }
 
     // Final layer norm
