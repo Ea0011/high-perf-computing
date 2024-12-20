@@ -324,9 +324,9 @@ RunState* initialize_runstate(ModelConfig cfg) {
     s->v_cache = (float*)calloc(cfg.num_layers * cfg.num_heads * cfg.max_context_len * cfg.head_dim, sizeof(float));
 
     // Attention matrices
-    s->q = (float*)calloc(cfg.head_dim * cfg.num_heads, sizeof(float));
-    s->k = (float*)calloc(cfg.head_dim * cfg.num_heads, sizeof(float));
-    s->v = (float*)calloc(cfg.head_dim * cfg.num_heads, sizeof(float));
+    s->q = (float*)calloc(cfg.num_layers * cfg.head_dim * cfg.num_heads, sizeof(float));
+    s->k = (float*)calloc(cfg.num_layers * cfg.head_dim * cfg.num_heads, sizeof(float));
+    s->v = (float*)calloc(cfg.num_layers * cfg.head_dim * cfg.num_heads, sizeof(float));
     s->attn_weights = (float*)calloc(cfg.max_context_len * cfg.num_heads, sizeof(float));
     s->attn_out = (float*)calloc(cfg.d_model, sizeof(float));
 
@@ -366,7 +366,7 @@ int forward(
                 s->x_norm,
                 model->Blocks[l].AttnBlock->wq + h * cfg.d_model * cfg.head_dim,
                 model->Blocks[l].AttnBlock->wq_bias + h * cfg.head_dim,
-                s->q + h * cfg.head_dim,
+                s->q + l * cfg.head_dim * cfg.num_heads + h * cfg.head_dim,
                 1,
                 cfg.d_model,
                 cfg.head_dim
@@ -375,7 +375,7 @@ int forward(
                 s->x_norm,
                 model->Blocks[l].AttnBlock->wk + h * cfg.d_model * cfg.head_dim,
                 model->Blocks[l].AttnBlock->wk_bias + h * cfg.head_dim,
-                s->k + h * cfg.head_dim,
+                s->k + l * cfg.head_dim * cfg.num_heads + h * cfg.head_dim,
                 1,
                 cfg.d_model,
                 cfg.head_dim
@@ -384,18 +384,14 @@ int forward(
                 s->x_norm,
                 model->Blocks[l].AttnBlock->wv + h * cfg.d_model * cfg.head_dim,
                 model->Blocks[l].AttnBlock->wv_bias + h * cfg.head_dim,
-                s->v + h * cfg.head_dim,
+                s->v + l * cfg.head_dim * cfg.num_heads + h * cfg.head_dim,
                 1,
                 cfg.d_model,
                 cfg.head_dim
             );
 
-            // Put the values and keys into the cache (layer, head, position, dim_head)
-            memcpy(s->k_cache + l * cfg.num_heads * cfg.max_context_len * cfg.head_dim + h * cfg.max_context_len * cfg.head_dim + s->position * cfg.head_dim, s->k + h * cfg.head_dim, cfg.head_dim * sizeof(float));
-            memcpy(s->v_cache + l * cfg.num_heads * cfg.max_context_len * cfg.head_dim + h * cfg.max_context_len * cfg.head_dim + s->position * cfg.head_dim, s->v + h * cfg.head_dim, cfg.head_dim * sizeof(float));
-            
             single_head_attention(
-                s->q + h * cfg.head_dim,
+                s->q + l * cfg.head_dim * cfg.num_heads + h * cfg.head_dim,
                 s->k_cache + l * cfg.num_heads * cfg.max_context_len * cfg.head_dim + h * cfg.max_context_len * cfg.head_dim,
                 s->v_cache + l * cfg.num_heads * cfg.max_context_len * cfg.head_dim + h * cfg.max_context_len * cfg.head_dim,
                 s->attn_weights + h * cfg.max_context_len,
@@ -436,10 +432,22 @@ int forward(
 
         // Skip connection
         vector_sum(s->x, s->x_ffn_down, cfg.d_model);
+    }
 
-        // nop
-        while (1) {
-            break;
+    for (int l = 0; l < cfg.num_layers; l++) {
+        int layer_offset = l * cfg.num_heads * cfg.max_context_len * cfg.head_dim;
+        int k_layer_offset = l * cfg.num_heads * cfg.head_dim;
+        #pragma omp parallel for schedule(dynamic) num_threads(4)
+        for (int h = 0; h < cfg.num_heads; h++) {
+            int head_offset = h * cfg.max_context_len * cfg.head_dim;
+            int k_head_offset = h * cfg.head_dim;
+            float* k_src = s->k + k_layer_offset + k_head_offset;
+            float* k_dest = s->k_cache + layer_offset + head_offset + s->position * cfg.head_dim;
+            memcpy(k_dest, k_src, cfg.head_dim * sizeof(float));
+
+            float* v_src = s->v + k_layer_offset + k_head_offset;
+            float* v_dest = s->v_cache + layer_offset + head_offset + s->position * cfg.head_dim;
+            memcpy(v_dest, v_src, cfg.head_dim * sizeof(float));
         }
     }
 
@@ -454,7 +462,7 @@ int forward(
 
     // Unembedding and Sample
     matmul_transpose(s->x_norm, model->UnEmbedding, s->logits, 1, cfg.d_model, cfg.vocab_size);
-    softmax(s->logits, cfg.vocab_size, 0.1);
+    softmax(s->logits, cfg.vocab_size, 0.5);
     int next_token = multinomial_sample(s->logits, cfg.vocab_size);
     
     return next_token;

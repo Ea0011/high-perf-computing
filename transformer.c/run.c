@@ -70,7 +70,7 @@ int main() {
     Model* model = (Model*)malloc(sizeof(Model));
 
     mmap_model_from_checkpoint(model, cfg, "./models/c_model_xxl.bin");
-    generate(cfg, model);
+    // generate(cfg, model);
     measure_tok_s(cfg, model, 100, 10);
     return 0;
 }
