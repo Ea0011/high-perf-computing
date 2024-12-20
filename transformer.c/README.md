@@ -18,6 +18,8 @@ For reference, average tok/s using HuggingFace is 30.64
 | Multi Threaded: Parallel MHA, Parallel Matmul, SIMD    |   36.6      |
 | Multi Threaded: Parallel MHA, Parallel Matmul, SIMD, Hinting at Largest SIMD Registers    |   43.17      |
 | Multi Threaded: Parallel MHA, Parallel Matmul, SIMD, Hinting at Largest SIMD Registers, Optimize Memory Accesses    |   51.72      |
+| Multi Threaded: Parallel MHA, Parallel Matmul, SIMD, Hinting at Largest SIMD Registers, Optimize Memory Accesses + Static OMP Schedule    |   64.12      |
+
 
 
 ## GPT2-xl - 1.61B Paramters
@@ -28,4 +30,6 @@ For reference, HuggingFace GPT2-xl performs at 3.12 tok/s
 |-----------------|---------|
 | Multi Threaded: Parallel MHA, Parallel Matmul, SIMD, Hinting at Largest SIMD Registers    |   3.88      |
 | Multi Threaded: Parallel MHA, Parallel Matmul, SIMD, Hinting at Largest SIMD Registers, Optimize Memory Accesses     |   4.58      |
+| Multi Threaded: Parallel MHA, Parallel Matmul, SIMD, Hinting at Largest SIMD Registers, Optimize Memory Accesses + Static OMP Schedule     |   5.38      |
+
 

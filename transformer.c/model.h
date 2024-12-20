@@ -360,7 +360,7 @@ int forward(
         );
 
         // MHA
-        #pragma omp parallel for schedule(dynamic) num_threads(4)
+        #pragma omp parallel for schedule(static) num_threads(4)
         for (int h = 0; h < cfg.num_heads; h++) {
             fused_matmul_bias_transpose(
                 s->x_norm,
