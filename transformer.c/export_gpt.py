@@ -1,5 +1,5 @@
-import torch
 import numpy as np
+import torch
 
 
 def summarize_weights(weights: dict):
@@ -7,17 +7,17 @@ def summarize_weights(weights: dict):
         print(key, weights[key].shape)
 
     # inspect biases
-    print("Biases:\n")
-    for key in weights.keys():
-        if "bias" in key:
-            print(key, weights[key].shape)
+    # print("Biases:\n")
+    # for key in weights.keys():
+    #     if "bias" in key:
+    #         print(key, weights[key].shape)
 
-    # Attention biases
-    # These are the biases that are added to the attention scores before softmax for masking
-    print("Attention biases:\n")
-    for key in weights.keys():
-        if "attn.bias" in key:
-            print(key, weights[key].shape, weights[key])
+    # # Attention biases
+    # # These are the biases that are added to the attention scores before softmax for masking
+    # print("Attention biases:\n")
+    # for key in weights.keys():
+    #     if "attn.bias" in key:
+    #         print(key, weights[key].shape, weights[key])
 
 def export_gpt(
     model: dict,
@@ -46,6 +46,7 @@ def export_gpt(
                 elif len(model[key].shape) == 1:
                     d_model = model[key].shape[0]
                     model[key] = model[key].view(3, d_model // 3)
+                    # model[key] = model[key].view(1, d_model).T.view(d_model // 3, 3)
 
             print(f"Writing {key} with shape {model[key].shape} at position {f.tell()}: Size in float32: {model[key].numpy().size * 4}")
             f.write(model[key].numpy().astype(np.float32).tobytes())
@@ -58,7 +59,7 @@ def export_gpt(
 
 
 if __name__ == "__main__":
-    weights = torch.load("./models/pytorch_model.bin", map_location="cpu")
+    weights = torch.load("./models/pytorch_model_s.bin", map_location="cpu")
 
     # summarize_weights(weights)
-    export_gpt(weights, "./models/c_model.bin")
+    export_gpt(weights, "./models/c_model_s.bin")
