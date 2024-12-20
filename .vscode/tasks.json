@@ -9,11 +9,11 @@
             "-o", "${workspaceFolder}/transformer.c/build/run.o",
             "${workspaceFolder}/transformer.c/run.c",
             "-g",          // Enables debug symbols
-            "-O0",         // Disables optimizations for easier debugging
+            "-O1",         // Disables optimizations for easier debugging
             "-Wall",       // Enables all warnings
             "-Wextra",     // Enables extra warnings
             "-Wpedantic",  // Enables strict compliance to the standard
-            "-lm"          // Links the math library
+            "-lm",          // Links the math library
         ],
         "problemMatcher": ["$gcc"],
         "group": {
